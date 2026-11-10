@@ -45,6 +45,12 @@ def note_for(c):
         parts.append(f"牙醫師 {c['dentists']} 位")
     if c.get('doctors'):
         parts.append('看診牙醫 ' + '、'.join(c['doctors']))
+    if c.get('otherPhones'):
+        parts.append('其他電話 ' + '、'.join(c['otherPhones']))
+    if c.get('regFee'):
+        parts.append('掛號費 ' + c['regFee'])
+    if c.get('checks'):
+        parts.append('需查證：' + '、'.join(c['checks']))
     if c.get('line'):
         parts.append(f"LINE {c['line']}")
     if c.get('googleRating') is not None:
