@@ -301,6 +301,11 @@ table.bom tr.grp td{background:var(--accent-soft);font-weight:700;font-size:12px
       <div class="row"><button class="btn primary" id="projNew">新增空白專案</button><button class="btn" id="projNewImg">從平面圖圖檔建立</button><button class="btn" id="projSample">從範例建立</button></div>
       <p>每個專案各自儲存在這台裝置的瀏覽器裡，修改會自動存檔。換電腦或備份時，請到「出圖」複製或下載 JSON。</p>
       <div id="projList" class="projlist"></div>
+      <div id="tplWrap" hidden>
+        <div class="subhead">範本圖面</div>
+        <p>從已畫好的圖面建立新專案，原本的專案不受影響。</p>
+        <div class="row" id="tplList"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -767,7 +772,28 @@ function renderProjects(){
     });
   });
 }
-async function openProjects(){ await flushSave(); renderProjects(); $('#projModal').hidden = false; }
+const TEMPLATES = [
+  {file:'plans/office-measured.json', name:'辦公室（實測尺寸）'},
+  {file:'plans/office-layout.json', name:'辦公室改造'},
+];
+let tplChecked = false;
+async function renderTemplates(){
+  if(tplChecked) return; tplChecked = true;
+  if(location.protocol === 'file:') return;
+  const ok = [];
+  for(const t of TEMPLATES){ try { const r = await fetch(t.file, {method:'HEAD'}); if(r.ok) ok.push(t); } catch(e){} }
+  if(!ok.length) return;
+  $('#tplList').innerHTML = ok.map((t,i) => `<button class="btn" data-tpl="${i}">${esc(t.name)}</button>`).join('');
+  $('#tplList').querySelectorAll('[data-tpl]').forEach(b => b.addEventListener('click', async () => {
+    const t = ok[+b.dataset.tpl];
+    try {
+      const d = await (await fetch(t.file)).json();
+      await createProject(d.name || t.name, sanitize(d)); closeModals(); toast(`已從範本建立「${d.name || t.name}」`);
+    } catch(e){ toast('範本載入失敗，請稍後再試'); }
+  }));
+  $('#tplWrap').hidden = false;
+}
+async function openProjects(){ await flushSave(); renderProjects(); $('#projModal').hidden = false; renderTemplates(); }
 function sanitize(d){
   const o = emptyDoc();
   for(const k of ['walls','rooms','items','labels','dims','pipes']) if(Array.isArray(d[k])) o[k] = d[k].filter(x => x && typeof x === 'object').map(x => ({...x, id: x.id ? String(x.id) : uid()}));
