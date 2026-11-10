@@ -421,6 +421,7 @@ const PIPES = {
   cond:{n:'冷凝排水管',s:['4分','6分'],c:'#5f9ea0',w:1.6,da:'2 2',L:'hvac',sh:'DR'},
   sa:{n:'新風送風管',s:['Ø100','Ø150','Ø200'],c:'#4f86e8',w:3.5,da:'',L:'hvac',sh:'SA'},
   ea:{n:'排風／回風管',s:['Ø100','Ø150','Ø200'],c:'#8c8c8c',w:3.5,da:'9 4',L:'hvac',sh:'EA'},
+  fire:{n:'消防灑水管',s:['1 吋','1.5 吋','2 吋','2.5 吋'],c:'#c0392b',w:2.5,da:'14 3 3 3',L:'hvac',sh:'SP'},
 };
 const SPECS = {
   note:{l:'備註',txt:1,ph:'材質、顏色、廠商…'},
@@ -471,6 +472,8 @@ const SPECS = {
   cmh:{l:'風量',o:['150','250','350','500','800'],u:'CMH'},
   ervMount:{l:'安裝',o:['吊隱式（天花內）','壁掛式','落地式']},
   ventSize:{l:'風口',o:['Ø100 圓形','Ø150 圓形','15×15 方形','線型出風口']},
+  sprType:{l:'型式',o:['向上型（外露天花）','向下型','側壁型','隱藏型']},
+  smkType:{l:'型式',o:['偵煙式','定溫式','差動式']},
 };
 const TYPES = {
   door:{n:'單開門',L:'arch',sp:['doorMat']}, door2:{n:'雙開門',L:'arch',sp:['doorMat']}, slide:{n:'推拉門',L:'arch',sp:['doorMat']}, window:{n:'窗戶',L:'arch',sp:['winType']},
@@ -495,6 +498,7 @@ const TYPES = {
   ac_cassette:{n:'嵌入式冷氣',L:'hvac',sp:['acBrand','model','cap','acKind','refrig']}, ac_out:{n:'冷氣室外機',L:'hvac',sp:['acBrand','model','cap','outPlace']},
   erv:{n:'全熱交換器',L:'hvac',sp:['ervBrand','model','cmh','ervMount']}, vent_sa:{n:'新風出風口',L:'hvac',sp:['ventSize']}, vent_ea:{n:'排風／回風口',L:'hvac',sp:['ventSize']},
   bathfan:{n:'浴室暖風乾燥機',L:'hvac',sp:['brand','model']},
+  sprinkler:{n:'灑水頭',L:'light',sp:['sprType']}, smoke:{n:'偵煙器',L:'light',sp:['smkType']},
   stairs:{n:'樓梯',L:'arch'}, column:{n:'柱子',L:'arch'}, beam:{n:'樑（虛線）',L:'arch'},
 };
 const CATALOG = [
@@ -542,6 +546,9 @@ const CATALOG = [
     {t:'ac_out',n:'冷氣室外機',w:70,h:28,s:{cap:'2.8'}},{t:'erv',n:'全熱交換器',w:80,h:55,s:{cmh:'250'}},
     {t:'vent_sa',n:'新風出風口',w:20,h:20},{t:'vent_ea',n:'排風／回風口',w:20,h:20},{t:'bathfan',n:'暖風乾燥機',w:40,h:40},
   ]},
+  {cat:'消防', items:[
+    {t:'sprinkler',n:'灑水頭',w:16,h:16},{t:'smoke',n:'偵煙器',w:22,h:22},
+  ]},
   {cat:'結構', items:[
     {t:'stairs',n:'樓梯',w:100,h:260},{t:'column',n:'柱子',w:50,h:50},{t:'beam',n:'樑（虛線）',w:300,h:30},
   ]},
@@ -557,7 +564,7 @@ const SHEETS = {
 const SHEET_NOTES = {
   A01:['家具尺寸為參考，以實際採購品項為準。'],
   A02:['隔間厚度含粉刷或封板完成面。','地坪材料以淨面積計，另計損耗。'],
-  A03:['CH 為完成面天花高度。','燈具位置以天花完成面放樣為準。'],
+  A03:['CH 為完成面天花高度；不做天花者為樓板下淨高。','燈具位置以天花完成面放樣為準。','新增隔間後灑水頭與偵煙器須依消防法規檢討，由消防技師辦理變更。'],
   A04:['插座及開關高度以完成地坪起算（FL+）。','管線路徑為示意，依現場施作調整。','220V 專用迴路需獨立配線。'],
   A05:['空調機型、尺寸為參考，以原廠型錄為準。','冷房能力粗估：坪數 × 0.5 kW，頂樓或西曬另加 20%。','冷媒管及排水管坡度依原廠規定。'],
 };
@@ -773,7 +780,7 @@ function renderProjects(){
   });
 }
 const TEMPLATES = [
-  {file:'plans/office-measured.json', name:'辦公室（實測尺寸）'},
+  {file:'plans/office-measured.json', name:'辦公室（實測尺寸・工業風）'},
   {file:'plans/office-layout.json', name:'辦公室改造'},
 ];
 let tplChecked = false;
@@ -899,6 +906,8 @@ function shape(type, w, h){
     case 'erv': return R(x,y,w,h,'fd') + R(x+4,y+4,w-8,h-8,'fl') + TX(0,0,'ERV',Math.min(16,h*.3));
     case 'vent_sa': return R(x,y,w,h,'f') + L(x,y,x+w,y+h,'fl') + L(x+w,y,x,y+h,'fl');
     case 'vent_ea': return R(x,y,w,h,'f') + L(x,y+h,x+w,y,'fl') + R(x+w*.3,y+h*.3,w*.4,h*.4,'fl');
+    case 'sprinkler': return C(0,0,m/2,'f') + L(-m*.5,0,m*.5,0,'fl') + L(0,-m*.5,0,m*.5,'fl') + C(0,0,m*.14,'solid');
+    case 'smoke': return C(0,0,m/2,'f') + TX(0,0,'S',m*.55);
     case 'bathfan': return R(x,y,w,h,'f') + C(0,0,m*.32,'fl') + TX(0,0,'暖',m*.3);
     case 'door': { const hy = h/2;
       return R(x,y,w,h,'op') + L(x,y,x,y+h,'opl') + L(x+w,y,x+w,y+h,'opl') + R(x,hy,4,w,'f') + P(`M${r1(x+w)} ${r1(hy)} A${r1(w)} ${r1(w)} 0 0 1 ${r1(x)} ${r1(hy+w)}`,'fd'); }
@@ -2028,7 +2037,7 @@ function mat(color, o={}){
 function box3(g, w, h, d, color, x, y, z, o){ const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(.5,w), Math.max(.5,h), Math.max(.5,d)), mat(color, o||{})); m.position.set(x, y+h/2, z); m.castShadow = !(o&&o.op); m.receiveShadow = true; g.add(m); return m; }
 function cyl3(g, rt, rb, h, color, x, y, z, o){ const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 24), mat(color, o||{})); m.position.set(x, y+h/2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
 function sph3(g, r, color, x, y, z, o){ const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat(color, o||{})); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; }
-const NO3D = new Set(['door','door2','slide','window','downlight','ceilinglamp','track','linear','ac_duct','ac_cassette','erv','vent_sa','vent_ea','bathfan','floordrain','beam']);
+const NO3D = new Set(['sprinkler','smoke','door','door2','slide','window','downlight','ceilinglamp','track','linear','ac_duct','ac_cassette','erv','vent_sa','vent_ea','bathfan','floordrain','beam']);
 function furn3D(it, st, H){
   if(NO3D.has(it.type) || TYPES[it.type]?.L==='elec') return null;
   const g = new THREE.Group(), w = it.w, d = it.h, c = it.color || null;
