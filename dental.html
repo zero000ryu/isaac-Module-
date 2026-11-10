@@ -250,14 +250,14 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
 <dialog id="erpDlg" aria-labelledby="erpTitle">
   <div class="dh"><h2 id="erpTitle">連結到 ERP（erp.top-geng.com）</h2><button class="btn sm" type="button" data-close>關閉</button></div>
   <div class="db">
-    <p style="margin-top:0">以下兩個網址每天自動更新、網址固定不變。在 ERP 的「外部資料匯入／排程匯入」設定其中一個網址，ERP 就能每天自動抓取最新的全台牙醫診所資料。</p>
+    <p style="margin-top:0">每天資料更新後，系統會自動把新開業的牙醫診所加入 ERP 的「客戶／診所名單」（類別：診所），已在 ERP 裡的不會重複也不會被覆蓋。其他系統也可以用以下固定網址匯入。</p>
     <dl class="kv">
       <dt>CSV（Excel／ERP 匯入）</dt><dd><code id="feedCsv" class="mono"></code><div class="links" style="margin-top:4px"><button class="btn sm" type="button" data-copy="feedCsv">複製網址</button><a class="btn sm" id="feedCsvA" target="_blank" rel="noopener">開啟</a></div></dd>
       <dt>JSON（API 串接）</dt><dd><code id="feedJson" class="mono"></code><div class="links" style="margin-top:4px"><button class="btn sm" type="button" data-copy="feedJson">複製網址</button></div></dd>
       <dt>對應主鍵</dt><dd>請以「醫事機構代碼」（10 碼）當作 ERP 客戶資料的唯一鍵，重複匯入時就會更新，不會新增重複資料。</dd>
       <dt>編碼</dt><dd>UTF-8（含 BOM），第一列為中文欄位名稱。</dd>
     </dl>
-    <p class="note">若 ERP 提供 API 金鑰與文件，也可以改為每天主動把新增或異動的診所推送到 ERP。</p>
+    
   </div>
   <div class="df"><a class="btn primary" href="https://erp.top-geng.com/" target="_blank" rel="noopener">開啟 ERP</a></div>
 </dialog>
