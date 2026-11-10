@@ -11,16 +11,42 @@ import argparse, concurrent.futures as cf, datetime as dt, json, os, re, sys, ti
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 URL = 'https://info.nhi.gov.tw/api/inae1000/inae1000s00/SQL300_1'
+HOURS_URL = 'https://info.nhi.gov.tw/api/inae1000/inae1000s00/SQL300_2'
 UA = 'Mozilla/5.0 (compatible; dental-roster-builder/1.0)'
 
 
-def detail(code, tries=3):
+def post(url, code, tries=3):
     body = json.dumps({'C_HospID': code, 'C_planType': ''}).encode()
     for i in range(tries):
         try:
-            req = urllib.request.Request(URL, data=body, method='POST', headers={'User-Agent': UA, 'Content-Type': 'application/json'})
+            req = urllib.request.Request(url, data=body, method='POST', headers={'User-Agent': UA, 'Content-Type': 'application/json'})
             with urllib.request.urlopen(req, timeout=60) as r:
-                rows = json.load(r)
+                return json.load(r)
+        except Exception as e:
+            if i == tries - 1:
+                raise
+            time.sleep(5 * (i + 1))
+
+
+def hours(code):
+    """Clinic hours as NHI shows them: 3 periods x 7 days (Mon..Sun), each '' (closed), 'open', or a time like 0900-1200."""
+    info = (post(HOURS_URL, code) or {}).get('srV_INFO') or {}
+    grid = []
+    for row in (info.get('srv_Time') or [])[:3]:
+        grid.append([('open' if (x.get('time') in ('-', '', None)) else x['time'].strip()) if x.get('yn') == 'N' else '' for x in row[:7]])
+    out = {'grid': grid} if grid else {}
+    memo = clean(info.get('srv_TimeMemo'))
+    if memo:
+        out['memo'] = memo
+    if clean(info.get('srv_Date')):
+        out['updated'] = info['srv_Date']
+    return out
+
+
+def detail(code, tries=3):
+    for i in range(tries):
+        try:
+            rows = post(URL, code)
             return rows[0] if rows else None
         except Exception as e:
             if i == tries - 1:
@@ -52,23 +78,34 @@ def main():
     today = dt.date.today().isoformat()
     cutoff = (dt.date.today() - dt.timedelta(days=a.max_age_days)).isoformat()
     # only NHI-contracted clinics have a detail page
-    todo = [c['code'] for c in clinics if c['status'] == '健保特約' and db.get(c['code'], {}).get('fetched', '') < cutoff]
+    todo = [c['code'] for c in clinics if c['status'] == '健保特約'
+            and (db.get(c['code'], {}).get('fetched', '') < cutoff or 'hoursFetched' not in db.get(c['code'], {}))]
     todo.sort(key=lambda k: db.get(k, {}).get('fetched', ''))
     def get(code):
         time.sleep(a.delay)
+        old = db.get(code, {})
         try:
-            return code, detail(code)
+            d = detail(code) if old.get('fetched', '') < cutoff else 'keep'
+            h = hours(code)
+            return code, d, h
         except Exception as e:
             print('  skip', code, repr(e)[:120], file=sys.stderr)
-            return code, False
+            return code, False, None
 
     done = 0
     with cf.ThreadPoolExecutor(a.workers) as ex:
-        for code, d in ex.map(get, todo[:a.limit]):
+        for code, d, h in ex.map(get, todo[:a.limit]):
             if d is False:
                 continue
-            rec = {'fetched': today}
-            if d:
+            if d == 'keep':
+                rec = dict(db[code])
+                rec.pop('hours', None)
+            else:
+                rec = {'fetched': today}
+            rec['hoursFetched'] = today
+            if h:
+                rec['hours'] = h
+            if d and d != 'keep':
                 fee = re.sub(r'^門診掛號費\s*', '', clean((d.get('fee') or {}).get('regisT_FEE_NAME'))).rstrip('。')
                 rec.update({
                     'name': clean(d.get('hosP_NAME')), 'phone': clean(d.get('hosptel')), 'address': clean(d.get('hosP_ADDR')),

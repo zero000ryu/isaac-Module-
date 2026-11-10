@@ -14,7 +14,7 @@ Then merges, keyed by 醫事機構代碼:
 
 Standard library only, so it runs anywhere (GitHub Actions, a laptop).
 """
-import argparse, csv, datetime as dt, io, json, os, re, sys, time, urllib.request, zipfile
+import argparse, csv, datetime as dt, io, json, os, re, sys, time, urllib.parse, urllib.request, zipfile
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -439,6 +439,32 @@ COMPLETENESS_FIELDS = ['phone', 'address', 'zip', 'hours', 'dentists', 'doctors'
                        'website', 'line', 'email', 'taxId', 'owner', 'googleRating']
 
 
+SPEC_LABEL = {'牙科': '一般牙科', '牙醫一般科': '一般牙科', '不分科': '一般牙科', '贋復補綴牙科': '補綴（贋復）牙科'}
+PROGRAM_LABEL = [('牙周病統合治療', '牙周病統合治療', 'BD'), ('特殊醫療服務', '身心障礙特殊需求', 'C6'),
+                 ('齲齒兒童', '兒童齲齒照護（0–6 歲）', None), ('到宅醫療', '牙醫到宅醫療', None), ('資源不足地區', '偏鄉巡迴醫療', None)]
+# verified links to a hospital's own dental doctor list (link only; content is not copied)
+HOSPITAL_DOCTOR_PAGES = {
+    '0401180014': 'https://www.ntuh.gov.tw/dent/Fpage.action?fid=3694',
+    '1302050014': 'https://www.kmuh.org.tw/Web/WebRegistration/DocIntro/ShowDocList?virtualCode=1300&JsonLoc=%5B%221300%22%5D',
+}
+
+
+def specialties(c):
+    out = []
+    for sp in c.get('specs', []):
+        sp = SPEC_LABEL.get(sp, sp)
+        if DENTAL_DEPT.search(sp) or sp == '一般牙科':
+            out.append(sp)
+    progs = ' '.join(c.get('programs', []))
+    dp = c.get('doctorPrograms', {})
+    for key, label, code in PROGRAM_LABEL:
+        if key in progs or (code and dp.get(code)):
+            out.append(label)
+    if dp.get('CT'):
+        out.append('牙齒外傷急症')
+    return list(dict.fromkeys(out))
+
+
 def load_geo():
     z = load_json('zip3.json').get('zip3', {})
     v = set(load_json('villages.json').get('villages', []))
@@ -595,6 +621,32 @@ def reconcile(clinics, nhi, mohw, detail, tda, geo):
             seen.setdefault(name, []).append(c['code'])
     multi = {k: v for k, v in seen.items() if len(v) > 1}
 
+    # exact hours from the NHI clinic page (a 3 x 7 grid of '' / 'open' / '0900-1200')
+    for c in clinics:
+        h = (detail.get(c['code']) or {}).get('hours') or {}
+        grid = h.get('grid')
+        if grid and len(grid) == 3:
+            bits = ''.join('1' if grid[p][d] else '0' for d in range(7) for p in range(3))
+            if c.get('hours') and bits != c['hours']:
+                checks = c.setdefault('checks', [])
+                if '看診時段不一致' not in checks:
+                    checks.append('看診時段不一致')
+            c['hours'] = bits  # the live page is the more current of the two
+            if any(cell not in ('', 'open') for row in grid for cell in row):
+                c['hoursTimes'] = grid
+            if h.get('updated'):
+                c['hoursUpdated'] = h['updated']
+
+    # specialty / service labels for filtering
+    for c in clinics:
+        c['specialties'] = specialties(c)
+
+    # where to read about a hospital's dentists: link only (hospital sites forbid republishing their content)
+    for c in clinics:
+        if c.get('type') == '醫院':
+            c['doctorPage'] = HOSPITAL_DOCTOR_PAGES.get(c['code']) or (
+                'https://www.google.com/search?q=' + urllib.parse.quote(f"{c['name']} 牙科 醫師介紹"))
+
     # roles: the responsible dentist of a clinic is its 院長
     for c in clinics:
         if c.get('owner') and c['type'] == '診所':
@@ -633,8 +685,27 @@ CSV_COLS = [('code', '醫事機構代碼'), ('name', '診所名稱'), ('status',
             ('otherPhones', '其他電話'), ('programs', '參與健保計畫'), ('regFee', '掛號費'), ('accessibility', '無障礙'),
             ('preventive', '預防保健服務'), ('completeness', '資料完整度'), ('checks', '比對注意事項'),
             ('category', '機構類型'), ('hospitalLevel', '醫院層級'), ('zip', '郵遞區號'), ('cityType', '縣市類型'),
-            ('districtType', '鄉鎮市區類型'), ('village', '村里'), ('fax', '傳真'), ('ownerMasked', '公會登記負責醫師')]
-LIST_COLS = {'specs', 'doctors', 'otherPhones', 'programs', 'preventive', 'checks'}
+            ('districtType', '鄉鎮市區類型'), ('village', '村里'), ('fax', '傳真'), ('ownerMasked', '公會登記負責醫師'),
+            ('specialties', '專科與服務'), ('hoursText', '看診時間'), ('doctorPage', '醫師介紹連結')]
+DAYS = '一二三四五六日'
+PERIODS = ('上午', '下午', '晚上')
+
+
+def hours_text(c):
+    bits, grid = c.get('hours', ''), c.get('hoursTimes')
+    if len(bits) != 21:
+        return ''
+    parts = []
+    for d in range(7):
+        seg = []
+        for p in range(3):
+            if bits[d * 3 + p] == '1':
+                t = grid[p][d] if grid and grid[p][d] not in ('', 'open') else ''
+                seg.append(PERIODS[p] + (f' {t[:2]}:{t[2:4]}-{t[5:7]}:{t[7:9]}' if re.fullmatch(r'\d{4}-\d{4}', t) else (f' {t}' if t else '')))
+        if seg:
+            parts.append(f'週{DAYS[d]} ' + '、'.join(seg))
+    return '；'.join(parts)
+LIST_COLS = {'specs', 'doctors', 'otherPhones', 'programs', 'preventive', 'checks', 'specialties'}
 
 
 def write_csv(clinics):
@@ -642,7 +713,7 @@ def write_csv(clinics):
         w = csv.writer(f)
         w.writerow([zh for _, zh in CSV_COLS])
         for c in clinics:
-            w.writerow(['、'.join(c.get(k, [])) if k in LIST_COLS else c.get(k, '') for k, _ in CSV_COLS])
+            w.writerow([hours_text(c) if k == 'hoursText' else '、'.join(c.get(k, [])) if k in LIST_COLS else c.get(k, '') for k, _ in CSV_COLS])
 
 
 if __name__ == '__main__':
