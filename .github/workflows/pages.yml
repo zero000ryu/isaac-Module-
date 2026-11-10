@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p _site/data
           cp index.html clinics.html dental.html _site/
+          cp -r plans _site/
           cp data/dental.json data/dental.csv _site/data/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
