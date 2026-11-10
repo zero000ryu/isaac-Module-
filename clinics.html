@@ -282,6 +282,12 @@ textarea{min-height:80px;resize:vertical}
   </form>
 </dialog>
 
+<dialog id="askDlg" aria-labelledby="askMsg" style="width:min(420px,calc(100vw - 32px))">
+  <form method="dialog">
+    <div class="body"><p id="askMsg" style="margin:0"></p></div>
+    <footer><span class="sp"></span><button class="btn" value="no">取消</button><button class="btn danger" value="yes" id="askYes">確定</button></footer>
+  </form>
+</dialog>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
@@ -521,7 +527,7 @@ form.addEventListener('submit', async e => {
 });
 $('#delBtn').addEventListener('click', async () => {
   const c = clinics.find(x => x.id === editing); if (!c) return;
-  if (!confirm(`確定要刪除「${c.name}」嗎？此動作無法復原。`)) return;
+  if (!await ask(`確定要刪除「${c.name}」嗎？此動作無法復原。`, '刪除')) return;
   clinics = clinics.filter(x => x.id !== editing);
   dlg.close(); refreshCityFilter(); render(); persist();
   toast('已刪除「' + c.name + '」');
@@ -659,7 +665,7 @@ drop.addEventListener('drop', e => e.dataTransfer.files[0] && readFile(e.dataTra
 async function readFile(file) {
   const buf = await file.arrayBuffer();
   let text = new TextDecoder('utf-8').decode(buf);
-  if (text.includes('�')) { try { text = new TextDecoder('big5').decode(buf); } catch (e) {} } // older Excel exports in Big5
+  if (text.includes('\uFFFD')) { try { text = new TextDecoder('big5').decode(buf); } catch (e) {} } // older Excel exports in Big5
   const prev = $('#importPreview');
   try {
     let list, unknown = [];
@@ -673,12 +679,12 @@ async function readFile(file) {
     $('#doImport').disabled = false;
   } catch (err) { pending = null; $('#doImport').disabled = true; prev.textContent = '無法讀取：' + err.message; }
 }
-$('#doImport').addEventListener('click', () => {
+$('#doImport').addEventListener('click', async () => {
   if (!pending) return;
   const mode = imp.querySelector('input[name=imode]:checked').value;
   let added = 0, updated = 0;
   if (mode === 'replace') {
-    if (clinics.length && !confirm(`會以 ${pending.length} 筆資料取代目前的 ${clinics.length} 筆名單，確定嗎？`)) return;
+    if (clinics.length && !await ask(`會以 ${pending.length} 筆資料取代目前的 ${clinics.length} 筆名單，確定嗎？`, '取代')) return;
     clinics = pending.map(p => p.c); added = pending.length;
   } else {
     for (const { raw, c: n } of pending) {
@@ -695,6 +701,13 @@ $('#doImport').addEventListener('click', () => {
 });
 
 /* ---------- misc ---------- */
+// in-page confirmation (browser confirm() is blocked in some embedded viewers)
+function ask(msg, yes) {
+  const d = $('#askDlg');
+  $('#askMsg').textContent = msg; $('#askYes').textContent = yes || '確定';
+  d.returnValue = ''; d.showModal();
+  return new Promise(res => d.addEventListener('close', () => res(d.returnValue === 'yes'), { once: true }));
+}
 let tt;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
 
