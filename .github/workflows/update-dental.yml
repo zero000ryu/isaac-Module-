@@ -1,0 +1,76 @@
+name: Update dental clinic data
+
+on:
+  schedule:
+    - cron: '23 19 * * *'   # every day 03:23 Taiwan time (UTC+8); NHI publishes daily
+  workflow_dispatch:
+    inputs:
+      tax:
+        description: 'Also scan the tax registry for 統一編號 (300 MB download)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-dental
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build from government open data
+        run: |
+          # tax registry is big and changes slowly: scan it on Mondays or when asked
+          if [ "$(date -u +%u)" = "1" ] || [ "${{ inputs.tax }}" = "true" ]; then TAX=--tax; fi
+          python scripts/build_dental.py $TAX
+      - name: Google rating and website (only if GOOGLE_MAPS_API_KEY secret is set)
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          GOOGLE_LIMIT: ${{ vars.GOOGLE_LIMIT || '300' }}
+        run: python scripts/enrich_google.py
+      - name: LINE, Facebook, 統編, 負責人 from clinic websites
+        run: python scripts/enrich_web.py --limit 400
+      - name: Merge enrichments
+        run: python scripts/build_dental.py --cache
+      - id: commit
+        name: Commit if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          # a run that only moved the timestamp is not a change
+          python - <<'PY'
+          import json, subprocess
+          try:
+              old = json.loads(subprocess.check_output(['git', 'show', 'HEAD:data/dental.json']))
+          except subprocess.CalledProcessError:
+              old = None
+          new = json.load(open('data/dental.json', encoding='utf-8'))
+          strip = lambda d: {**d, 'meta': {k: v for k, v in d['meta'].items() if k != 'generatedAt'}}
+          if old and strip(old) == strip(new):
+              subprocess.run(['git', 'checkout', '--', 'data/dental.json'], check=True)
+          PY
+          git add data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "No data changes"; exit 0
+          fi
+          git commit -m "Update dental clinic data $(TZ=Asia/Taipei date +%F)"
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.changed == 'true'
+    uses: ./.github/workflows/pages.yml
