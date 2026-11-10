@@ -70,6 +70,13 @@ jobs:
           git push origin HEAD:main
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
+      - name: Send new clinics to the ERP (only if ERP_EMAIL / ERP_PASSWORD secrets are set)
+        env:
+          ERP_EMAIL: ${{ secrets.ERP_EMAIL }}
+          ERP_PASSWORD: ${{ secrets.ERP_PASSWORD }}
+          ERP_SCOPE: ${{ vars.ERP_SCOPE || 'open' }}
+        run: python scripts/sync_erp.py
+
   deploy:
     needs: update
     if: needs.update.outputs.changed == 'true'
