@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -22,11 +23,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main   # when called after the data update, deploy the freshly committed data
       - name: Prepare site
         run: |
-          mkdir -p _site
-          cp index.html _site/
+          mkdir -p _site/data
+          cp index.html clinics.html dental.html _site/
           cp -r plans _site/
+          cp data/dental.json data/dental.csv _site/data/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

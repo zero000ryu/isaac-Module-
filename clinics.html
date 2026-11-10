@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>診所名單系統</title>
+<meta name="description" content="管理診所名單：新增、編輯、搜尋、篩選科別與縣市、追蹤聯絡進度，並可匯入匯出 CSV 與 JSON。">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#eef1ee; --panel:#fbfcfa; --ink:#1c2a2b; --muted:#5d6b6a; --line:#d5dcd8;
+  --accent:#2c6a5d; --accent-ink:#ffffff; --accent-soft:#dcebe5; --warn:#c8701e; --warn-soft:#f6e6d4;
+  --danger:#b8402f; --danger-soft:#f4dcd7; --row-hover:#f2f5f2;
+  --s-active:#2c6a5d; --s-talk:#2f5f9a; --s-lead:#7a6a2a; --s-pause:#7b7f80;
+  --shadow:0 8px 30px rgba(20,40,36,.14);
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111718; --panel:#182122; --ink:#e3ebe8; --muted:#97a6a3; --line:#2a3637;
+    --accent:#79c2ac; --accent-ink:#0e1a17; --accent-soft:#1f3430; --warn:#f0a04f; --warn-soft:#3a2c1c;
+    --danger:#ef7f6b; --danger-soft:#3a2420; --row-hover:#1d2829;
+    --s-active:#79c2ac; --s-talk:#86aee6; --s-lead:#d6c27a; --s-pause:#9aa3a4;
+    --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111718; --panel:#182122; --ink:#e3ebe8; --muted:#97a6a3; --line:#2a3637;
+  --accent:#79c2ac; --accent-ink:#0e1a17; --accent-soft:#1f3430; --warn:#f0a04f; --warn-soft:#3a2c1c;
+  --danger:#ef7f6b; --danger-soft:#3a2420; --row-hover:#1d2829;
+  --s-active:#79c2ac; --s-talk:#86aee6; --s-lead:#d6c27a; --s-pause:#9aa3a4;
+  --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto}
+
+header.top{display:flex;align-items:center;gap:12px;padding-block:16px 12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0;margin-right:auto}
+.brand h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.06em}
+.brand .mark{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);
+  border-radius:8px;padding:7px 12px;min-height:36px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn svg{width:16px;height:16px;flex:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{border-color:var(--danger)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{min-height:30px;padding:4px 9px;font-size:13px}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:left;
+  display:flex;flex-direction:column;gap:2px}
+button.stat:hover{border-color:var(--accent)}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-family:var(--f-mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat.warn .v{color:var(--warn)}
+.stat[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:10px;margin-bottom:10px}
+.filters .search{flex:1 1 240px;position:relative}
+.filters .search svg{position:absolute;left:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--muted)}
+.filters input[type=search]{width:100%;padding-left:34px}
+input,select,textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 10px;min-height:36px;min-width:0}
+select{padding-right:28px}
+.filters select{flex:0 1 auto}
+.count{font-size:13px;color:var(--muted);margin:0 2px 8px}
+
+.table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:500;color:var(--muted);background:var(--panel);position:sticky;top:0;white-space:nowrap;z-index:1}
+th button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+th button:focus-visible{outline:2px solid var(--accent)}
+th .arr{font-size:10px;opacity:.7}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--row-hover)}
+tbody tr:last-child td{border-bottom:none}
+td .name{font-weight:500}
+td .sub{font-size:12px;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.status.s-合作中{color:var(--s-active)} .status.s-洽談中{color:var(--s-talk)}
+.status.s-潛在客戶{color:var(--s-lead)} .status.s-暫停{color:var(--s-pause)}
+.due{font-size:12px;white-space:nowrap}
+.due.over{color:var(--danger);font-weight:500}
+.due.soon{color:var(--warn);font-weight:500}
+.empty{padding:48px 16px;text-align:center;color:var(--muted)}
+.empty p{margin:0 0 12px}
+a.tel{color:inherit;text-decoration:none}
+a.tel:hover{text-decoration:underline}
+
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;
+  width:min(720px,calc(100vw - 32px));max-height:calc(100dvh - 32px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,20,18,.45)}
+dialog form{display:flex;flex-direction:column;max-height:calc(100dvh - 34px)}
+dialog header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+dialog header h2{margin:0;font-size:16px}
+dialog .body{padding:16px;overflow:auto}
+dialog footer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+dialog footer .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field.full{grid-column:1/-1}
+.field label,.field .lab{font-size:12px;color:var(--muted)}
+.field .req{color:var(--danger)}
+textarea{min-height:80px;resize:vertical}
+.spec-pick{display:flex;flex-wrap:wrap;gap:6px}
+.spec-pick label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--ink)}
+.spec-pick input{position:absolute;opacity:0;pointer-events:none}
+.spec-pick label:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.spec-pick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+.dup{background:var(--warn-soft);border:1px solid var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
+.meta{font-size:12px;color:var(--muted);margin-top:12px}
+.hint{font-size:13px;color:var(--muted);margin:0 0 10px}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.radio-row{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}
+.radio-row label{display:inline-flex;align-items:center;gap:6px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:9px 16px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:50;max-width:calc(100vw - 32px)}
+.menu{position:relative}
+.menu-pop{position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--shadow);padding:6px;min-width:200px;z-index:20;display:flex;flex-direction:column}
+.menu-pop button{all:unset;cursor:pointer;padding:8px 10px;border-radius:6px;font-size:14px}
+.menu-pop button:hover,.menu-pop button:focus-visible{background:var(--accent-soft)}
+.menu-pop hr{border:none;border-top:1px solid var(--line);margin:4px 0}
+
+@media (max-width:820px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filters select{flex:1 1 calc(33% - 8px);padding-left:8px;padding-right:4px}
+}
+@media (max-width:720px){
+  .btn .lbl{display:none}
+  .btn.primary .lbl{display:inline}
+  .table-wrap{background:transparent;border:none;overflow:visible}
+  table,thead,tbody,tr,td{display:block}
+  thead{display:none}
+  tbody tr{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;
+    display:grid;grid-template-columns:1fr auto;gap:4px 10px}
+  td{border:none;padding:0}
+  td.c-name{grid-column:1}
+  td.c-status{grid-column:2;grid-row:1;text-align:right}
+  td.c-spec,td.c-addr,td.c-phone,td.c-due{grid-column:1/-1}
+  td.c-doc{display:none}
+  td.c-due:empty{display:none}
+  .grid{grid-template-columns:1fr}
+}
+@media print{
+  body{background:#fff;color:#000}
+  header.top .actions,.filters,.stats,dialog,.toast{display:none!important}
+  .table-wrap{border:none}
+  th{position:static}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand"><h1>診所名單系統</h1><span class="mark">Clinic Roster</span></div>
+  <div class="actions">
+    <a class="btn" href="dental.html" style="text-decoration:none" title="全台牙醫診所資料庫"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg><span class="lbl">全台牙醫診所</span></a>
+    <button class="btn primary" id="addBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">新增診所</span></button>
+    <button class="btn" id="importBtn" type="button" title="匯入 CSV 或 JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span class="lbl">匯入</span></button>
+    <div class="menu">
+      <button class="btn" id="exportBtn" type="button" aria-haspopup="true" aria-expanded="false" title="匯出名單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg><span class="lbl">匯出</span></button>
+      <div class="menu-pop" id="exportMenu" hidden role="menu">
+        <button type="button" role="menuitem" data-exp="csv-view">CSV（目前篩選結果）</button>
+        <button type="button" role="menuitem" data-exp="csv-all">CSV（全部）</button>
+        <button type="button" role="menuitem" data-exp="copy">複製表格（貼到 Excel）</button>
+        <button type="button" role="menuitem" data-exp="json">JSON 備份</button>
+        <hr>
+        <button type="button" role="menuitem" data-exp="print">列印名單</button>
+        <button type="button" role="menuitem" data-exp="template">下載 CSV 範本</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="stats" aria-label="名單統計">
+  <button class="stat" type="button" data-quick="" aria-pressed="false"><span class="k">全部診所</span><span class="v" id="stTotal">0</span></button>
+  <button class="stat" type="button" data-quick="合作中" aria-pressed="false"><span class="k">合作中</span><span class="v" id="stActive">0</span></button>
+  <button class="stat" type="button" data-quick="洽談中" aria-pressed="false"><span class="k">洽談中</span><span class="v" id="stTalk">0</span></button>
+  <button class="stat warn" type="button" data-quick="__due" aria-pressed="false"><span class="k">7 天內需追蹤</span><span class="v" id="stDue">0</span></button>
+</section>
+
+<section class="filters" aria-label="搜尋與篩選">
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" id="q" placeholder="搜尋名稱、醫師、電話、地址、標籤…" aria-label="搜尋">
+  </div>
+  <select id="fCity" aria-label="縣市"><option value="">全部縣市</option></select>
+  <select id="fSpec" aria-label="科別"><option value="">全部科別</option></select>
+  <select id="fStatus" aria-label="狀態"><option value="">全部狀態</option></select>
+  <button class="btn ghost sm" id="clearFilters" type="button">清除篩選</button>
+</section>
+
+<p class="count" id="count" aria-live="polite"></p>
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th><button type="button" data-sort="name">診所名稱 <span class="arr"></span></button></th>
+      <th>科別</th>
+      <th><button type="button" data-sort="city">地區 / 地址 <span class="arr"></span></button></th>
+      <th>電話</th>
+      <th><button type="button" data-sort="doctor">負責醫師 <span class="arr"></span></button></th>
+      <th><button type="button" data-sort="status">狀態 <span class="arr"></span></button></th>
+      <th><button type="button" data-sort="nextFollow">下次追蹤 <span class="arr"></span></button></th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden></div>
+</div>
+</div>
+
+<dialog id="editDlg" aria-labelledby="editTitle">
+  <form method="dialog" id="editForm" novalidate>
+    <header><h2 id="editTitle">新增診所</h2><button class="btn ghost sm" type="button" data-close>關閉</button></header>
+    <div class="body">
+      <div class="dup" id="dupWarn" hidden></div>
+      <div class="grid">
+        <div class="field full"><label for="f-name">診所名稱 <span class="req">*</span></label><input id="f-name" name="name" required autocomplete="off"></div>
+        <div class="field full"><span class="lab">科別（可複選）</span><div class="spec-pick" id="f-specs"></div></div>
+        <div class="field"><label for="f-city">縣市</label><select id="f-city" name="city"></select></div>
+        <div class="field"><label for="f-district">鄉鎮市區</label><input id="f-district" name="district" placeholder="例如：大安區"></div>
+        <div class="field full"><label for="f-address">地址</label><input id="f-address" name="address"></div>
+        <div class="field"><label for="f-phone">電話</label><input id="f-phone" name="phone" type="tel" placeholder="02-2700-1234"></div>
+        <div class="field"><label for="f-mobile">手機</label><input id="f-mobile" name="mobile" type="tel"></div>
+        <div class="field"><label for="f-doctor">負責醫師</label><input id="f-doctor" name="doctor"></div>
+        <div class="field"><label for="f-contact">聯絡人 / 職稱</label><input id="f-contact" name="contact" placeholder="例如：林護理長"></div>
+        <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email"></div>
+        <div class="field"><label for="f-website">網站 / 粉專</label><input id="f-website" name="website" type="url" placeholder="https://"></div>
+        <div class="field"><label for="f-code">醫事機構代碼</label><input id="f-code" name="code" inputmode="numeric"></div>
+        <div class="field"><label for="f-nhi">健保特約</label><select id="f-nhi" name="nhi"><option value="">未填</option><option>是</option><option>否</option></select></div>
+        <div class="field full"><label for="f-hours">門診時間</label><input id="f-hours" name="hours" placeholder="例如：週一至週五 9-12、15-21；週六上午"></div>
+        <div class="field"><label for="f-status">狀態</label><select id="f-status" name="status"></select></div>
+        <div class="field"><label for="f-source">來源</label><input id="f-source" name="source" placeholder="例如：轉介、展會、官網"></div>
+        <div class="field"><label for="f-lastContact">上次聯絡</label><input id="f-lastContact" name="lastContact" type="date"></div>
+        <div class="field"><label for="f-nextFollow">下次追蹤</label><input id="f-nextFollow" name="nextFollow" type="date"></div>
+        <div class="field full"><label for="f-tags">標籤（以逗號分隔）</label><input id="f-tags" name="tags" placeholder="例如：VIP, 連鎖, 新開業"></div>
+        <div class="field full"><label for="f-notes">備註</label><textarea id="f-notes" name="notes"></textarea></div>
+      </div>
+      <div class="meta" id="editMeta"></div>
+    </div>
+    <footer>
+      <button class="btn danger" type="button" id="delBtn" hidden>刪除</button>
+      <button class="btn" type="button" id="dupBtn" hidden>複製一筆</button>
+      <span class="sp"></span>
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn primary" type="submit" id="saveBtn">儲存</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="importDlg" aria-labelledby="importTitle">
+  <form method="dialog">
+    <header><h2 id="importTitle">匯入名單</h2><button class="btn ghost sm" type="button" data-close>關閉</button></header>
+    <div class="body">
+      <p class="hint">支援 CSV（Excel 另存為「CSV UTF-8」）或本系統的 JSON 備份。第一列需為欄位名稱，例如「診所名稱、科別、縣市、地址、電話」；可先下載範本。</p>
+      <div class="drop" id="drop">把檔案拖到這裡，或 <button class="btn sm" type="button" id="pickFile">選擇檔案</button>
+        <input type="file" id="fileInput" accept=".csv,.json,.txt,text/csv,application/json" hidden></div>
+      <div class="radio-row" role="radiogroup" aria-label="匯入方式">
+        <label><input type="radio" name="imode" value="merge" checked> 合併（同名同電話的診所會更新）</label>
+        <label><input type="radio" name="imode" value="replace"> 取代全部名單</label>
+      </div>
+      <p class="hint" id="importPreview"></p>
+    </div>
+    <footer><span class="sp"></span><button class="btn" type="button" data-close>取消</button><button class="btn primary" type="button" id="doImport" disabled>匯入</button></footer>
+  </form>
+</dialog>
+
+<dialog id="askDlg" aria-labelledby="askMsg" style="width:min(420px,calc(100vw - 32px))">
+  <form method="dialog">
+    <div class="body"><p id="askMsg" style="margin:0"></p></div>
+    <footer><span class="sp"></span><button class="btn" value="no">取消</button><button class="btn danger" value="yes" id="askYes">確定</button></footer>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+'use strict';
+const CITIES = ['臺北市','新北市','基隆市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
+const SPECS = ['家醫科','內科','小兒科','牙科','皮膚科','眼科','耳鼻喉科','婦產科','骨科','復健科','泌尿科','身心科','中醫','醫美','外科','其他'];
+const STATUSES = ['潛在客戶','洽談中','合作中','暫停'];
+const FIELDS = [
+  ['name','診所名稱'],['specs','科別'],['city','縣市'],['district','鄉鎮市區'],['address','地址'],['phone','電話'],['mobile','手機'],
+  ['doctor','負責醫師'],['contact','聯絡人'],['email','Email'],['website','網站'],['code','醫事機構代碼'],['nhi','健保特約'],
+  ['hours','門診時間'],['status','狀態'],['source','來源'],['lastContact','上次聯絡'],['nextFollow','下次追蹤'],['tags','標籤'],['notes','備註']
+];
+const ALIASES = { '名稱':'name','診所':'name','機構名稱':'name','醫療機構名稱':'name','科':'specs','科別':'specs','診療科別':'specs',
+  '縣市別':'city','城市':'city','區':'district','行政區':'district','鄉鎮區':'district','地址':'address','機構地址':'address',
+  '電話':'phone','市話':'phone','聯絡電話':'phone','機構電話':'phone','手機':'mobile','醫師':'doctor','負責人':'doctor','院長':'doctor',
+  '聯絡窗口':'contact','e-mail':'email','信箱':'email','網址':'website','官網':'website','代碼':'code','機構代碼':'code','醫事機構代碼':'code',
+  '健保':'nhi','特約':'nhi','看診時間':'hours','營業時間':'hours','進度':'status','標籤':'tags','tag':'tags','備註':'notes','說明':'notes' };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const todayStr = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const normPhone = p => String(p || '').replace(/\D/g, '');
+const normName = n => String(n || '').replace(/\s+/g, '').replace(/台/g, '臺').toLowerCase();
+const normCity = c => { c = String(c || '').trim().replace(/台/g, '臺'); if (!c) return ''; return CITIES.find(x => x === c || x.slice(0,2) === c) || c; };
+
+/* ---------- storage: IndexedDB with localStorage fallback, memory as last resort ---------- */
+const store = (() => {
+  const KEY = 'clinics';
+  let dbp = null, mem = null;
+  const idb = () => dbp || (dbp = new Promise((res, rej) => {
+    try { const r = indexedDB.open('clinic-roster', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }));
+  return {
+    async load() {
+      try { const db = await idb(); return await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(KEY); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+      catch (e) { try { const v = localStorage.getItem('clinic-roster:' + KEY); return v ? JSON.parse(v) : mem; } catch (_) { return mem; } }
+    },
+    async save(v) {
+      mem = v;
+      try { const db = await idb(); await new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, KEY); t.oncomplete = res; t.onerror = () => rej(t.error); }); return true; }
+      catch (e) { try { localStorage.setItem('clinic-roster:' + KEY, JSON.stringify(v)); return true; } catch (_) { return false; } }
+    }
+  };
+})();
+
+let clinics = [];
+let editing = null;
+let sort = { key: 'name', dir: 1 };
+let quick = '';
+let savedWarned = false;
+
+const persist = async () => {
+  const ok = await store.save(clinics);
+  if (!ok && !savedWarned) { savedWarned = true; toast('這個瀏覽器無法存檔，關閉前請先匯出 JSON 備份'); }
+};
+
+function sanitize(c) {
+  const o = { id: c.id || uid() };
+  for (const [k] of FIELDS) o[k] = k === 'specs' || k === 'tags' ? [] : '';
+  for (const [k] of FIELDS) {
+    let v = c[k];
+    if (v == null) continue;
+    if (k === 'specs' || k === 'tags') {
+      v = Array.isArray(v) ? v : String(v).split(/[,，、;；/|]/);
+      o[k] = [...new Set(v.map(s => String(s).trim()).filter(Boolean))];
+    } else o[k] = String(v).trim();
+  }
+  o.city = normCity(o.city);
+  if (!STATUSES.includes(o.status)) o.status = o.status ? (STATUSES.find(s => o.status.includes(s.slice(0,2))) || '潛在客戶') : '潛在客戶';
+  if (o.nhi) o.nhi = /^(是|y|yes|true|1|有|特約)/i.test(o.nhi) ? '是' : /^(否|n|no|false|0|無)/i.test(o.nhi) ? '否' : '';
+  for (const k of ['lastContact','nextFollow']) o[k] = normDate(o[k]);
+  o.createdAt = c.createdAt || new Date().toISOString();
+  o.updatedAt = c.updatedAt || o.createdAt;
+  return o;
+}
+function normDate(v) {
+  if (!v) return '';
+  const m = String(v).trim().match(/^(\d{2,4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (!m) return '';
+  let y = +m[1]; if (y < 1000) y += 1911; // 民國年
+  return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+}
+
+/* ---------- filtering + render ---------- */
+const fill = (sel, items, first) => { sel.innerHTML = (first ? `<option value="">${first}</option>` : '') + items.map(i => `<option>${esc(i)}</option>`).join(''); };
+fill($('#fSpec'), SPECS, '全部科別');
+fill($('#fStatus'), STATUSES, '全部狀態');
+fill($('#f-city'), [''].concat(CITIES)); $('#f-city').options[0].textContent = '未填';
+fill($('#f-status'), STATUSES);
+$('#f-specs').innerHTML = SPECS.map(s => `<label><input type="checkbox" value="${esc(s)}">${esc(s)}</label>`).join('');
+
+function refreshCityFilter() {
+  const sel = $('#fCity'), cur = sel.value;
+  const used = new Set(clinics.map(c => c.city).filter(Boolean));
+  const list = CITIES.filter(c => used.has(c)).concat([...used].filter(c => !CITIES.includes(c)).sort());
+  fill(sel, list, '全部縣市');
+  sel.value = list.includes(cur) ? cur : '';
+}
+
+function daysUntil(d) {
+  if (!d) return null;
+  return Math.round((new Date(d + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 864e5);
+}
+
+function filtered() {
+  const q = $('#q').value.trim().toLowerCase();
+  const terms = q ? q.split(/\s+/) : [];
+  const city = $('#fCity').value, spec = $('#fSpec').value, status = $('#fStatus').value;
+  return clinics.filter(c => {
+    if (city && c.city !== city) return false;
+    if (spec && !c.specs.includes(spec)) return false;
+    if (status && c.status !== status) return false;
+    if (quick === '__due') { const d = daysUntil(c.nextFollow); if (d === null || d > 7) return false; }
+    if (terms.length) {
+      const hay = [c.name,c.doctor,c.contact,c.phone,c.mobile,c.city,c.district,c.address,c.email,c.code,c.source,c.notes,c.specs.join(' '),c.tags.join(' ')].join(' ').toLowerCase();
+      const digits = normPhone(q);
+      if (!terms.every(t => hay.includes(t)) && !(digits.length >= 4 && (normPhone(c.phone).includes(digits) || normPhone(c.mobile).includes(digits)))) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const k = sort.key;
+    let av, bv;
+    if (k === 'city') { av = (CITIES.indexOf(a.city) + 100) + a.district; bv = (CITIES.indexOf(b.city) + 100) + b.district; }
+    else if (k === 'status') { av = STATUSES.indexOf(a.status); bv = STATUSES.indexOf(b.status); return (av - bv) * sort.dir || a.name.localeCompare(b.name, 'zh-Hant'); }
+    else if (k === 'nextFollow') { av = a.nextFollow || '9999'; bv = b.nextFollow || '9999'; }
+    else { av = a[k] || ''; bv = b[k] || ''; }
+    return String(av).localeCompare(String(bv), 'zh-Hant') * sort.dir;
+  });
+}
+
+function dueBadge(d) {
+  const n = daysUntil(d);
+  if (n === null) return '';
+  const cls = n < 0 ? 'over' : n <= 7 ? 'soon' : '';
+  const txt = n < 0 ? `逾期 ${-n} 天` : n === 0 ? '今天' : n === 1 ? '明天' : `${n} 天後`;
+  return `<span class="due ${cls}"><span class="mono">${esc(d.slice(5).replace('-','/'))}</span> · ${txt}</span>`;
+}
+
+function render() {
+  const list = filtered();
+  $('#stTotal').textContent = clinics.length;
+  $('#stActive').textContent = clinics.filter(c => c.status === '合作中').length;
+  $('#stTalk').textContent = clinics.filter(c => c.status === '洽談中').length;
+  $('#stDue').textContent = clinics.filter(c => { const d = daysUntil(c.nextFollow); return d !== null && d <= 7; }).length;
+  document.querySelectorAll('.stat').forEach(b => {
+    const v = b.dataset.quick;
+    b.setAttribute('aria-pressed', String(v === '' ? !quick && !$('#fStatus').value : v === '__due' ? quick === '__due' : $('#fStatus').value === v && !quick));
+  });
+  document.querySelectorAll('th [data-sort]').forEach(b => {
+    b.querySelector('.arr').textContent = b.dataset.sort === sort.key ? (sort.dir > 0 ? '▲' : '▼') : '';
+    b.closest('th').setAttribute('aria-sort', b.dataset.sort === sort.key ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none');
+  });
+
+  $('#rows').innerHTML = list.map(c => {
+    const area = [c.city, c.district].filter(Boolean).join(' ');
+    const phone = c.phone || c.mobile;
+    return `<tr data-id="${esc(c.id)}" tabindex="0">
+      <td class="c-name"><div class="name">${esc(c.name)}</div>${c.tags.length ? `<div class="chips" style="margin-top:3px">${c.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}</td>
+      <td class="c-spec"><div class="chips">${c.specs.map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div></td>
+      <td class="c-addr">${area ? `<div>${esc(area)}</div>` : ''}${c.address ? `<div class="sub">${esc(c.address)}</div>` : ''}</td>
+      <td class="c-phone">${phone ? `<a class="tel mono" href="tel:${esc(normPhone(phone))}">${esc(phone)}</a>` : ''}</td>
+      <td class="c-doc">${esc(c.doctor)}${c.contact ? `<div class="sub">${esc(c.contact)}</div>` : ''}</td>
+      <td class="c-status"><span class="status s-${esc(c.status)}">${esc(c.status)}</span></td>
+      <td class="c-due">${dueBadge(c.nextFollow)}</td>
+    </tr>`;
+  }).join('');
+
+  const empty = $('#empty');
+  if (!clinics.length) {
+    empty.hidden = false;
+    empty.innerHTML = `<p>名單還是空的。可以手動新增，或從 Excel 匯入 CSV。</p>
+      <button class="btn primary" type="button" data-act="add">新增第一間診所</button>
+      <button class="btn" type="button" data-act="import">匯入 CSV</button>
+      <button class="btn" type="button" data-act="sample">載入範例資料</button>`;
+  } else if (!list.length) {
+    empty.hidden = false;
+    empty.innerHTML = `<p>沒有符合條件的診所。</p><button class="btn" type="button" data-act="clear">清除篩選</button>`;
+  } else empty.hidden = true;
+  $('#count').textContent = clinics.length ? (list.length === clinics.length ? `共 ${clinics.length} 間診所` : `顯示 ${list.length} / ${clinics.length} 間診所`) : '';
+}
+
+/* ---------- edit dialog ---------- */
+const dlg = $('#editDlg'), form = $('#editForm');
+function openEdit(c) {
+  editing = c ? c.id : null;
+  const d = c || sanitize({ status: '潛在客戶' });
+  $('#editTitle').textContent = c ? '編輯診所' : '新增診所';
+  for (const [k] of FIELDS) {
+    if (k === 'specs') { form.querySelectorAll('#f-specs input').forEach(i => i.checked = d.specs.includes(i.value)); continue; }
+    const el = $('#f-' + k); if (!el) continue;
+    if (k === 'city' && d.city && ![...el.options].some(o => o.value === d.city)) el.add(new Option(d.city, d.city));
+    el.value = k === 'tags' ? d.tags.join(', ') : d[k];
+  }
+  $('#delBtn').hidden = $('#dupBtn').hidden = !c;
+  $('#editMeta').textContent = c ? `建立於 ${fmtTime(c.createdAt)} · 最後修改 ${fmtTime(c.updatedAt)}` : '';
+  $('#dupWarn').hidden = true;
+  dlg.showModal();
+  $('#f-name').focus();
+}
+const fmtTime = iso => { try { return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return iso; } };
+function readForm() {
+  const o = {};
+  for (const [k] of FIELDS) {
+    if (k === 'specs') o.specs = [...form.querySelectorAll('#f-specs input:checked')].map(i => i.value);
+    else { const el = $('#f-' + k); if (el) o[k] = el.value; }
+  }
+  return o;
+}
+function findDup(o, ignoreId) {
+  const n = normName(o.name), p = normPhone(o.phone);
+  return clinics.find(c => c.id !== ignoreId && ((n && normName(c.name) === n) || (p.length >= 7 && normPhone(c.phone) === p)));
+}
+function checkDup() {
+  const o = readForm(), dup = o.name || o.phone ? findDup(o, editing) : null, w = $('#dupWarn');
+  if (dup) { w.hidden = false; w.innerHTML = `名單裡已有相似的診所：<strong>${esc(dup.name)}</strong>${dup.phone ? `（${esc(dup.phone)}）` : ''}。仍可儲存。`; }
+  else w.hidden = true;
+}
+$('#f-name').addEventListener('change', checkDup);
+$('#f-phone').addEventListener('change', checkDup);
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const o = readForm();
+  if (!o.name.trim()) { $('#f-name').focus(); toast('請填寫診所名稱'); return; }
+  if (editing) {
+    const i = clinics.findIndex(c => c.id === editing);
+    const prev = clinics[i];
+    clinics[i] = sanitize({ ...o, id: prev.id, createdAt: prev.createdAt, updatedAt: new Date().toISOString() });
+    toast('已儲存變更');
+  } else {
+    clinics.push(sanitize({ ...o, createdAt: new Date().toISOString() }));
+    toast('已新增「' + o.name.trim() + '」');
+  }
+  dlg.close(); refreshCityFilter(); render(); persist();
+});
+$('#delBtn').addEventListener('click', async () => {
+  const c = clinics.find(x => x.id === editing); if (!c) return;
+  if (!await ask(`確定要刪除「${c.name}」嗎？此動作無法復原。`, '刪除')) return;
+  clinics = clinics.filter(x => x.id !== editing);
+  dlg.close(); refreshCityFilter(); render(); persist();
+  toast('已刪除「' + c.name + '」');
+});
+$('#dupBtn').addEventListener('click', () => {
+  editing = null;
+  $('#f-name').value += '（分院）';
+  $('#editTitle').textContent = '新增診所（複製）';
+  $('#delBtn').hidden = $('#dupBtn').hidden = true;
+  $('#editMeta').textContent = '';
+  $('#f-name').focus(); $('#f-name').select();
+});
+document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
+
+/* ---------- table events ---------- */
+$('#rows').addEventListener('click', e => {
+  if (e.target.closest('a')) return;
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  openEdit(clinics.find(c => c.id === tr.dataset.id));
+});
+$('#rows').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const tr = e.target.closest('tr[data-id]'); if (!tr || e.target !== tr) return;
+  e.preventDefault(); openEdit(clinics.find(c => c.id === tr.dataset.id));
+});
+document.querySelectorAll('th [data-sort]').forEach(b => b.addEventListener('click', () => {
+  sort = sort.key === b.dataset.sort ? { key: sort.key, dir: -sort.dir } : { key: b.dataset.sort, dir: 1 };
+  render();
+}));
+['#q','#fCity','#fSpec','#fStatus'].forEach(s => $(s).addEventListener('input', () => { if (s === '#fStatus') quick = ''; render(); saveView(); }));
+document.querySelectorAll('.stat').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.quick;
+  if (v === '__due') { quick = quick === '__due' ? '' : '__due'; $('#fStatus').value = ''; }
+  else { quick = ''; $('#fStatus').value = v && $('#fStatus').value !== v ? v : ''; }
+  render(); saveView();
+}));
+function clearFilters() { $('#q').value = ''; $('#fCity').value = ''; $('#fSpec').value = ''; $('#fStatus').value = ''; quick = ''; render(); saveView(); }
+$('#clearFilters').addEventListener('click', clearFilters);
+$('#empty').addEventListener('click', e => {
+  const a = e.target.closest('[data-act]')?.dataset.act;
+  if (a === 'add') openEdit(null);
+  else if (a === 'import') openImport();
+  else if (a === 'clear') clearFilters();
+  else if (a === 'sample') { clinics = SAMPLE().map(sanitize); refreshCityFilter(); render(); persist(); toast('已載入 5 筆範例資料，可直接修改或刪除'); }
+});
+$('#addBtn').addEventListener('click', () => openEdit(null));
+document.addEventListener('keydown', e => {
+  if (document.querySelector('dialog[open]')) return;
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); $('#q').focus(); }
+  if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); openEdit(null); }
+});
+
+/* per-viewer convenience: remember filters */
+function saveView() { try { localStorage.setItem('clinic-roster:view', JSON.stringify({ q: $('#q').value, city: $('#fCity').value, spec: $('#fSpec').value, status: $('#fStatus').value, quick, sort })); } catch (e) {} }
+function loadView() {
+  try { const v = JSON.parse(localStorage.getItem('clinic-roster:view') || 'null'); if (!v) return;
+    $('#q').value = v.q || ''; $('#fSpec').value = v.spec || ''; $('#fStatus').value = v.status || ''; quick = v.quick || '';
+    if (v.sort) sort = v.sort; refreshCityFilter(); $('#fCity').value = v.city || ''; } catch (e) {}
+}
+
+/* ---------- CSV ---------- */
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '');
+  const delim = (text.split('\n')[0].match(/\t/g) || []).length > (text.split('\n')[0].match(/,/g) || []).length ? '\t' : ',';
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i+1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function mapHeader(h) {
+  const t = h.trim().replace(/\s+/g, '').replace(/[（(].*?[)）]/g, '');
+  const lower = t.toLowerCase();
+  const byLabel = FIELDS.find(([k, l]) => l === t || k.toLowerCase() === lower);
+  if (byLabel) return byLabel[0];
+  return ALIASES[t] || ALIASES[lower] || null;
+}
+function rowsToClinics(rows) {
+  if (rows.length < 2) return { list: [], unknown: [] };
+  const head = rows[0].map(mapHeader), unknown = rows[0].filter((h, i) => !head[i] && h.trim());
+  const list = rows.slice(1).map(r => { const o = {}; head.forEach((k, i) => { if (k && r[i] != null && r[i] !== '') o[k] = o[k] ? o[k] + ' ' + r[i] : r[i]; }); return o; })
+    .filter(o => o.name && o.name.trim());
+  return { list, unknown };
+}
+const csvCell = v => { v = String(v ?? ''); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+function toCSV(list, delim = ',') {
+  const lines = [FIELDS.map(f => f[1]).join(delim)];
+  for (const c of list) lines.push(FIELDS.map(([k]) => { const v = Array.isArray(c[k]) ? c[k].join('、') : c[k]; return delim === ',' ? csvCell(v) : String(v ?? '').replace(/[\t\n\r]+/g, ' '); }).join(delim));
+  return lines.join('\r\n');
+}
+function download(name, text, type) {
+  const blob = new Blob([text], { type }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---------- export menu ---------- */
+const expBtn = $('#exportBtn'), expMenu = $('#exportMenu');
+expBtn.addEventListener('click', e => { e.stopPropagation(); expMenu.hidden = !expMenu.hidden; expBtn.setAttribute('aria-expanded', String(!expMenu.hidden)); if (!expMenu.hidden) expMenu.querySelector('button').focus(); });
+document.addEventListener('click', e => { if (!e.target.closest('.menu')) { expMenu.hidden = true; expBtn.setAttribute('aria-expanded', 'false'); } });
+expMenu.addEventListener('keydown', e => { if (e.key === 'Escape') { expMenu.hidden = true; expBtn.focus(); } });
+expMenu.addEventListener('click', async e => {
+  const k = e.target.closest('[data-exp]')?.dataset.exp; if (!k) return;
+  expMenu.hidden = true; expBtn.setAttribute('aria-expanded', 'false');
+  const stamp = todayStr();
+  if (k === 'template') return download('診所名單範本.csv', '﻿' + toCSV(SAMPLE().slice(0, 1).map(sanitize)), 'text/csv;charset=utf-8');
+  if (k === 'print') return window.print();
+  if (!clinics.length) return toast('名單是空的，沒有資料可以匯出');
+  if (k === 'csv-view' || k === 'csv-all') { const l = k === 'csv-all' ? clinics : filtered(); download(`診所名單_${stamp}.csv`, '﻿' + toCSV(l), 'text/csv;charset=utf-8'); toast(`已匯出 ${l.length} 筆`); }
+  else if (k === 'json') { download(`診所名單備份_${stamp}.json`, JSON.stringify({ app: 'clinic-roster', version: 1, exportedAt: new Date().toISOString(), clinics }, null, 2), 'application/json'); toast('已下載 JSON 備份'); }
+  else if (k === 'copy') {
+    const l = filtered(), tsv = toCSV(l, '\t');
+    try { await navigator.clipboard.writeText(tsv); toast(`已複製 ${l.length} 筆，可直接貼到 Excel`); }
+    catch (err) { download(`診所名單_${stamp}.tsv`, '﻿' + tsv, 'text/tab-separated-values;charset=utf-8'); toast('無法存取剪貼簿，已改為下載檔案'); }
+  }
+});
+
+/* ---------- import dialog ---------- */
+const imp = $('#importDlg'); let pending = null;
+function openImport() { pending = null; $('#importPreview').textContent = ''; $('#doImport').disabled = true; $('#fileInput').value = ''; imp.showModal(); }
+$('#importBtn').addEventListener('click', openImport);
+$('#pickFile').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => e.target.files[0] && readFile(e.target.files[0]));
+const drop = $('#drop');
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => e.dataTransfer.files[0] && readFile(e.dataTransfer.files[0]));
+async function readFile(file) {
+  const buf = await file.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) { try { text = new TextDecoder('big5').decode(buf); } catch (e) {} } // older Excel exports in Big5
+  const prev = $('#importPreview');
+  try {
+    let list, unknown = [];
+    if (/\.json$/i.test(file.name) || /^\s*[\[{]/.test(text)) {
+      const j = JSON.parse(text); list = Array.isArray(j) ? j : j.clinics;
+      if (!Array.isArray(list)) throw new Error('JSON 格式不符');
+    } else ({ list, unknown } = rowsToClinics(parseCSV(text)));
+    if (!list.length) throw new Error('找不到任何有「診所名稱」的資料列');
+    pending = list.map(raw => ({ raw, c: sanitize(raw) }));
+    prev.innerHTML = `讀到 <strong>${pending.length}</strong> 筆診所（${esc(file.name)}）。` + (unknown.length ? `<br>以下欄位無法對應，將略過：${unknown.map(esc).join('、')}` : '');
+    $('#doImport').disabled = false;
+  } catch (err) { pending = null; $('#doImport').disabled = true; prev.textContent = '無法讀取：' + err.message; }
+}
+$('#doImport').addEventListener('click', async () => {
+  if (!pending) return;
+  const mode = imp.querySelector('input[name=imode]:checked').value;
+  let added = 0, updated = 0;
+  if (mode === 'replace') {
+    if (clinics.length && !await ask(`會以 ${pending.length} 筆資料取代目前的 ${clinics.length} 筆名單，確定嗎？`, '取代')) return;
+    clinics = pending.map(p => p.c); added = pending.length;
+  } else {
+    for (const { raw, c: n } of pending) {
+      const ex = clinics.find(c => c.id === n.id) || clinics.find(c => normName(c.name) === normName(n.name) && (!n.phone || !c.phone || normPhone(c.phone) === normPhone(n.phone)));
+      if (ex) {
+        // only overwrite fields the file actually filled in, so blank cells never reset existing data
+        for (const [k] of FIELDS) { const r = raw[k]; if (r == null || String(r).trim() === '') continue; const v = n[k]; if (Array.isArray(v) ? v.length : v) ex[k] = v; }
+        ex.updatedAt = new Date().toISOString(); updated++;
+      } else { clinics.push(n); added++; }
+    }
+  }
+  imp.close(); refreshCityFilter(); render(); persist();
+  toast(`匯入完成：新增 ${added} 筆` + (updated ? `、更新 ${updated} 筆` : ''));
+});
+
+/* ---------- misc ---------- */
+// in-page confirmation (browser confirm() is blocked in some embedded viewers)
+function ask(msg, yes) {
+  const d = $('#askDlg');
+  $('#askMsg').textContent = msg; $('#askYes').textContent = yes || '確定';
+  d.returnValue = ''; d.showModal();
+  return new Promise(res => d.addEventListener('close', () => res(d.returnValue === 'yes'), { once: true }));
+}
+let tt;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
+
+function SAMPLE() {
+  const d = n => { const x = new Date(); x.setDate(x.getDate() + n); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0,10); };
+  return [
+    { name:'安和家庭醫學科診所', specs:['家醫科','內科'], city:'臺北市', district:'大安區', address:'安和路二段 100 號 1 樓', phone:'02-2700-1234', doctor:'陳志明', contact:'林護理長', nhi:'是', hours:'週一至週六 9-12、15-21', status:'合作中', source:'轉介', lastContact:d(-12), nextFollow:d(3), tags:['老客戶'], notes:'候診區預計明年翻新' },
+    { name:'晴光小兒科診所', specs:['小兒科'], city:'新北市', district:'板橋區', address:'文化路一段 50 號', phone:'02-2960-5678', doctor:'王美華', nhi:'是', status:'洽談中', source:'官網詢問', lastContact:d(-3), nextFollow:d(-1), tags:['新開業'], notes:'需要兒童遊戲區規劃' },
+    { name:'微笑牙醫診所', specs:['牙科'], city:'臺中市', district:'西屯區', address:'市政路 300 號', phone:'04-2251-0000', doctor:'張家豪', contact:'吳經理', email:'service@example.com', nhi:'是', status:'潛在客戶', source:'展會', nextFollow:d(14), tags:['連鎖'] },
+    { name:'明視眼科診所', specs:['眼科'], city:'高雄市', district:'苓雅區', address:'四維三路 20 號', phone:'07-335-2222', doctor:'李宗翰', nhi:'是', status:'暫停', lastContact:d(-90), notes:'業主延後計畫至明年' },
+    { name:'仁心中醫診所', specs:['中醫'], city:'桃園市', district:'中壢區', address:'中正路 88 號', phone:'03-425-6789', doctor:'黃建國', nhi:'是', status:'合作中', source:'轉介', lastContact:d(-30), nextFollow:d(6), tags:['VIP'] }
+  ];
+}
+
+(async () => {
+  const data = await store.load();
+  clinics = Array.isArray(data) ? data.map(sanitize) : [];
+  refreshCityFilter(); loadView(); render();
+})();
+})();
+</script>
+</body>
+</html>

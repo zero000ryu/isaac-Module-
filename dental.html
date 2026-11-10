@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>全台牙醫診所</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="全台灣牙醫診所資料庫：依縣市統計、搜尋與篩選，資料來自健保署、衛福部、財政部開放資料，每日自動更新。">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#eef1ee; --panel:#fbfcfa; --ink:#1c2a2b; --muted:#5d6b6a; --line:#d5dcd8; --grid:#e3e8e4;
+  --accent:#2c6a5d; --accent-ink:#fff; --accent-soft:#dcebe5; --row-hover:#f2f5f2; --warn:#a85a12; --danger:#b8402f;
+  --series-1:#2a78d6; --series-2:#eb6834; --track:#e7ebe8;
+  --shadow:0 8px 30px rgba(20,40,36,.14);
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111718; --panel:#182122; --ink:#e3ebe8; --muted:#97a6a3; --line:#2a3637; --grid:#223031;
+    --accent:#79c2ac; --accent-ink:#0e1a17; --accent-soft:#1f3430; --row-hover:#1d2829; --warn:#f0a04f; --danger:#ef7f6b;
+    --series-1:#3987e5; --series-2:#d95926; --track:#1f2a2b;
+    --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111718; --panel:#182122; --ink:#e3ebe8; --muted:#97a6a3; --line:#2a3637; --grid:#223031;
+  --accent:#79c2ac; --accent-ink:#0e1a17; --accent-soft:#1f3430; --row-hover:#1d2829; --warn:#f0a04f; --danger:#ef7f6b;
+  --series-1:#3987e5; --series-2:#d95926; --track:#1f2a2b;
+  --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  padding:0 max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+.wrap{max-width:1240px;margin:0 auto}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+header.top{display:flex;align-items:center;gap:12px;padding-block:16px 6px;flex-wrap:wrap}
+.brand{margin-right:auto;min-width:0}
+.brand h1{margin:0;font-size:20px;letter-spacing:.06em}
+.brand p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;
+  padding:7px 12px;min-height:36px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.sm{min-height:30px;padding:4px 10px;font-size:13px}
+.btn svg{width:16px;height:16px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:12px 0}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-family:var(--f-mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.3}
+.tile .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;min-width:0}
+.card h2{margin:0;font-size:15px}
+.card .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.card .head .sub{font-size:12px;color:var(--muted)}
+.card .head .sp{flex:1}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.charts{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}
+
+/* horizontal stacked bars, HTML-based so they reflow on phones */
+.bars{display:flex;flex-direction:column;gap:2px}
+.bar-row{display:grid;grid-template-columns:64px minmax(0,1fr) 56px;align-items:center;gap:8px;padding:3px 4px;border-radius:6px;
+  background:none;border:none;text-align:left;width:100%}
+.bar-row:hover,.bar-row:focus-visible{background:var(--row-hover)}
+.bar-row[aria-pressed="true"]{background:var(--accent-soft)}
+.bar-row .lab{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-row .track{position:relative;height:16px;display:flex;gap:2px}
+.bar-row .seg{height:16px;min-width:0}
+.bar-row .seg.a{background:var(--series-1)}
+.bar-row .seg.b{background:var(--series-2)}
+.bar-row .seg:last-child{border-radius:0 4px 4px 0}
+.bar-row .val{font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+.bars.single .seg{background:var(--series-1)}
+.bars.single .bar-row{grid-template-columns:112px minmax(0,1fr) 48px}
+.tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;
+  padding:8px 10px;font-size:12px;z-index:40;min-width:150px}
+.tip b{display:block;font-size:13px;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:12px}
+.tip .r span:first-child{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.tip i{width:8px;height:8px;border-radius:2px;display:inline-block}
+details.tbl{margin-top:10px;font-size:13px}
+details.tbl summary{cursor:pointer;color:var(--muted)}
+details.tbl table{margin-top:8px}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters .search{flex:1 1 260px;position:relative}
+.filters .search svg{position:absolute;left:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--muted)}
+input,select{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 10px;min-height:36px;min-width:0}
+.filters input[type=search]{width:100%;padding-left:34px}
+.checks{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.checks label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer}
+.checks input{position:absolute;opacity:0;pointer-events:none}
+.checks label:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+.checks label:has(input:focus-visible){outline:2px solid var(--accent)}
+.result-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px;color:var(--muted)}
+.result-bar .sp{flex:1}
+
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:500;color:var(--muted);white-space:nowrap;background:var(--panel)}
+td.num,th.num{text-align:right}
+tbody tr{cursor:pointer}
+#rows tr:hover{background:var(--row-hover)}
+tbody tr:last-child td{border-bottom:none}
+.name{font-weight:500}
+.sub{font-size:12px;color:var(--muted)}
+.badge{font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);white-space:nowrap}
+.badge.nhi{border-color:var(--series-1)}
+.badge.self{border-color:var(--series-2)}
+.badge.end{color:var(--muted)}
+.links{display:flex;gap:6px;flex-wrap:wrap}
+.links a,.links span{font-size:12px;white-space:nowrap}
+.star{white-space:nowrap}
+.pager{display:flex;gap:6px;align-items:center;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;
+  width:min(680px,calc(100vw - 32px));max-height:calc(100dvh - 32px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,20,18,.45)}
+dialog .dh{display:flex;align-items:flex-start;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+dialog .dh h2{margin:0;font-size:17px;flex:1}
+dialog .db{padding:16px;overflow:auto;max-height:calc(100dvh - 160px)}
+dialog .df{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+dl.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 12px;margin:0}
+dl.kv dt{color:var(--muted);font-size:13px}
+dl.kv dd{margin:0;overflow-wrap:anywhere}
+.hours{display:grid;grid-template-columns:36px repeat(7,minmax(0,1fr));gap:2px;font-size:12px;margin-top:4px;max-width:360px}
+.hours div{text-align:center;padding:2px 0;border-radius:4px}
+.hours .on{background:var(--accent-soft);color:var(--ink)}
+.hours .off{color:var(--muted)}
+.hours .h{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;
+  border-radius:8px;font-size:13px;box-shadow:var(--shadow);z-index:50;max-width:calc(100vw - 32px)}
+.loading{padding:60px 0;text-align:center;color:var(--muted)}
+footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
+
+@media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} .charts{grid-template-columns:1fr} }
+@media (max-width:640px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .btn .lbl{display:none}
+  .filters select{flex:1 1 calc(50% - 4px)}
+  thead{display:none}
+  table,tbody,tr,td{display:block}
+  .table-wrap{border:none;overflow:visible}
+  #rows tr{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  #rows td{border:none;padding:2px 0}
+  #rows td.c-dent,#rows td.c-code{display:none}
+  #rows td.num{text-align:left}
+  dl.kv{grid-template-columns:80px minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand"><h1>全台牙醫診所</h1><p id="updated">載入資料中…</p></div>
+  <div class="actions">
+    <a class="btn" href="clinics.html" aria-label="我的診所名單" title="我的診所名單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl">我的診所名單</span></a>
+    <button class="btn" id="erpBtn" type="button" aria-label="ERP 串接" title="ERP 串接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span class="lbl">ERP 串接</span></button>
+    <button class="btn" id="exportBtn" type="button" aria-label="匯出篩選結果 CSV" title="匯出篩選結果 CSV"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg><span class="lbl">匯出篩選結果 CSV</span></button>
+  </div>
+</header>
+
+<div id="loading" class="loading">正在載入全台牙醫診所資料…</div>
+<main id="app" hidden>
+<section class="tiles" aria-label="總覽">
+  <div class="tile"><div class="k">營業中診所</div><div class="v" id="tOpen"></div><div class="s" id="tOpenS"></div></div>
+  <div class="tile"><div class="k">健保特約</div><div class="v" id="tNhi"></div><div class="s" id="tNhiS"></div></div>
+  <div class="tile"><div class="k">自費（無健保特約）</div><div class="v" id="tSelf"></div><div class="s" id="tSelfS"></div></div>
+  <div class="tile"><div class="k">執業牙醫師</div><div class="v" id="tDent"></div><div class="s" id="tDentS"></div></div>
+  <div class="tile"><div class="k">有 Google 評分</div><div class="v" id="tG"></div><div class="s" id="tGS"></div></div>
+  <div class="tile"><div class="k">有 LINE 官方帳號</div><div class="v" id="tLine"></div><div class="s" id="tLineS"></div></div>
+</section>
+
+<div class="charts">
+  <section class="card" aria-labelledby="cityTitle">
+    <div class="head"><h2 id="cityTitle">各縣市牙醫診所數</h2><span class="sub">點縣市即可篩選下方名單</span><span class="sp"></span>
+      <div class="legend"><span><i style="background:var(--series-1)"></i>健保特約</span><span><i style="background:var(--series-2)"></i>自費</span></div></div>
+    <div class="bars" id="cityBars" role="group" aria-label="各縣市診所數"></div>
+    <details class="tbl"><summary>以表格檢視</summary><div class="table-wrap"><table><thead><tr><th>縣市</th><th class="num">健保特約</th><th class="num">自費</th><th class="num">合計</th><th class="num">牙醫師</th></tr></thead><tbody id="cityTable"></tbody></table></div></details>
+  </section>
+  <section class="card" aria-labelledby="distTitle">
+    <div class="head"><h2 id="distTitle">鄉鎮市區</h2><span class="sub" id="distSub"></span></div>
+    <div class="bars single" id="distBars" role="group" aria-label="鄉鎮市區診所數"></div>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="searchTitle">
+  <div class="head"><h2 id="searchTitle">搜尋診所</h2></div>
+  <div class="filters">
+    <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="q" placeholder="診所名稱、地址、電話、機構代碼、負責人、LINE…" aria-label="搜尋"></div>
+    <select id="fCity" aria-label="縣市"><option value="">全部縣市</option></select>
+    <select id="fDist" aria-label="鄉鎮市區"><option value="">全部區域</option></select>
+    <select id="fStatus" aria-label="狀態">
+      <option value="open">營業中</option><option value="健保特約">健保特約</option><option value="自費">自費</option><option value="已終止">已終止特約／歇業</option><option value="">全部（含已終止）</option>
+    </select>
+    <select id="sortSel" aria-label="排序">
+      <option value="city">依地區排序</option><option value="name">依名稱排序</option><option value="rating">Google 評分高→低</option>
+      <option value="reviews">評論數多→少</option><option value="dentists">牙醫師人數多→少</option><option value="since">特約最久</option><option value="newest">最新開業</option>
+    </select>
+  </div>
+  <div class="checks" role="group" aria-label="條件">
+    <label><input type="checkbox" data-f="website">有網站</label>
+    <label><input type="checkbox" data-f="line">有 LINE</label>
+    <label><input type="checkbox" data-f="rating">有 Google 評分</label>
+    <label><input type="checkbox" data-f="taxId">有統編</label>
+    <label><input type="checkbox" data-f="night">晚上有看診</label>
+    <label><input type="checkbox" data-f="sat">週六有看診</label>
+    <label><input type="checkbox" data-f="sun">週日有看診</label>
+    <label><input type="checkbox" data-f="multi">2 位以上牙醫師</label>
+  </div>
+  <div class="result-bar"><span id="count" aria-live="polite"></span><span class="sp"></span><button class="btn sm" id="reset" type="button">清除條件</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>診所</th><th>地址 / 電話</th><th>狀態</th><th class="num">Google</th><th class="num">牙醫師</th><th>聯絡管道</th><th>機構代碼</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>沒有符合條件的診所</div>
+  </div>
+  <div class="pager" id="pager"></div>
+</section>
+
+<footer class="src" id="sources"></footer>
+</main>
+</div>
+
+<div class="tip" id="tip" hidden></div>
+
+<dialog id="dlg" aria-labelledby="dName">
+  <div class="dh"><h2 id="dName"></h2><button class="btn sm" type="button" id="dClose">關閉</button></div>
+  <div class="db" id="dBody"></div>
+  <div class="df"><button class="btn primary" type="button" id="dAdd">加入我的診所名單</button><a class="btn" id="dMap" target="_blank" rel="noopener">在 Google 地圖開啟</a></div>
+</dialog>
+<dialog id="erpDlg" aria-labelledby="erpTitle">
+  <div class="dh"><h2 id="erpTitle">連結到 ERP（erp.top-geng.com）</h2><button class="btn sm" type="button" data-close>關閉</button></div>
+  <div class="db">
+    <p style="margin-top:0">以下兩個網址每天自動更新、網址固定不變。在 ERP 的「外部資料匯入／排程匯入」設定其中一個網址，ERP 就能每天自動抓取最新的全台牙醫診所資料。</p>
+    <dl class="kv">
+      <dt>CSV（Excel／ERP 匯入）</dt><dd><code id="feedCsv" class="mono"></code><div class="links" style="margin-top:4px"><button class="btn sm" type="button" data-copy="feedCsv">複製網址</button><a class="btn sm" id="feedCsvA" target="_blank" rel="noopener">開啟</a></div></dd>
+      <dt>JSON（API 串接）</dt><dd><code id="feedJson" class="mono"></code><div class="links" style="margin-top:4px"><button class="btn sm" type="button" data-copy="feedJson">複製網址</button></div></dd>
+      <dt>對應主鍵</dt><dd>請以「醫事機構代碼」（10 碼）當作 ERP 客戶資料的唯一鍵，重複匯入時就會更新，不會新增重複資料。</dd>
+      <dt>編碼</dt><dd>UTF-8（含 BOM），第一列為中文欄位名稱。</dd>
+    </dl>
+    <p class="note">若 ERP 提供 API 金鑰與文件，也可以改為每天主動把新增或異動的診所推送到 ERP。</p>
+  </div>
+  <div class="df"><a class="btn primary" href="https://erp.top-geng.com/" target="_blank" rel="noopener">開啟 ERP</a></div>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+'use strict';
+const CITIES = ['臺北市','新北市','基隆市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
+const PAGE = 50;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n || 0).toLocaleString('zh-TW');
+const digits = s => String(s || '').replace(/\D/g, '');
+let all = [], meta = {}, view = [], page = 0;
+let cityPick = '';
+
+const isOpen = c => c.status !== '已終止';
+const night = c => c.hours && [...Array(7)].some((_, d) => c.hours[d*3+2] === '1');
+const satOpen = c => c.hours && c.hours.slice(15, 18).includes('1');
+const sunOpen = c => c.hours && c.hours.slice(18, 21).includes('1');
+const mapUrl = c => c.googleUrl || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.name + ' ' + (c.address || ''));
+const lineUrl = l => !l ? '' : /^https?:/.test(l) ? l : 'https://line.me/R/ti/p/' + encodeURIComponent(l.startsWith('@') || l.startsWith('~') ? l : '@' + l);
+const ymd = s => s && s.length === 8 ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slice(6)}` : '';
+
+/* ---------- load ---------- */
+fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
+  meta = d.meta; all = d.clinics;
+  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
+  init();
+}).catch(e => {
+  $('#loading').innerHTML = '無法載入資料（' + esc(e.message) + '）。<br>請透過網站網址開啟本頁；若直接以檔案開啟，瀏覽器會擋下資料讀取，可在專案資料夾執行 <code>python3 -m http.server</code> 再開啟 http://localhost:8000/dental.html';
+});
+
+function init() {
+  $('#loading').hidden = true; $('#app').hidden = false;
+  const t = new Date(meta.generatedAt);
+  $('#updated').textContent = `資料更新：${isNaN(t) ? meta.generatedAt : t.toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })} · 每日自動更新`;
+  const cities = CITIES.filter(c => all.some(x => x.city === c));
+  $('#fCity').innerHTML = '<option value="">全部縣市</option>' + cities.map(c => `<option>${c}</option>`).join('');
+  const s = meta.sources || {};
+  $('#sources').innerHTML = '資料來源：' + Object.values(s).filter(x => x.used !== false).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join('、') +
+    '。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
+  restore(); tiles(); charts(); apply();
+}
+
+/* ---------- tiles ---------- */
+function tiles() {
+  const open = all.filter(isOpen), nhi = open.filter(c => c.status === '健保特約'), self = open.filter(c => c.status === '自費');
+  const dent = open.reduce((s, c) => s + (c.dentists || 0), 0);
+  const withDent = open.filter(c => c.dentists).length;
+  const g = open.filter(c => c.googleRating != null), line = open.filter(c => c.line);
+  const pct = n => open.length ? (n / open.length * 100).toFixed(1) + '%' : '';
+  $('#tOpen').textContent = fmt(open.length); $('#tOpenS').textContent = `另有 ${fmt(all.length - open.length)} 間已終止`;
+  $('#tNhi').textContent = fmt(nhi.length); $('#tNhiS').textContent = pct(nhi.length);
+  $('#tSelf').textContent = fmt(self.length); $('#tSelfS').textContent = pct(self.length);
+  $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '';
+  $('#tG').textContent = fmt(g.length);
+  $('#tGS').textContent = g.length ? `平均 ${(g.reduce((s, c) => s + c.googleRating, 0) / g.length).toFixed(2)} ★` : '尚未設定 Google API';
+  $('#tLine').textContent = fmt(line.length); $('#tLineS').textContent = line.length ? pct(line.length) : '需先取得診所網站';
+}
+
+/* ---------- charts ---------- */
+const tip = $('#tip');
+function showTip(e, html) {
+  tip.innerHTML = html; tip.hidden = false;
+  const r = tip.getBoundingClientRect(), x = e.clientX ?? (e.target.getBoundingClientRect().left + 80), y = e.clientY ?? e.target.getBoundingClientRect().top;
+  tip.style.left = Math.min(window.innerWidth - r.width - 8, x + 14) + 'px';
+  tip.style.top = Math.max(8, Math.min(window.innerHeight - r.height - 8, y + 14)) + 'px';
+}
+const hideTip = () => tip.hidden = true;
+
+function barRows(el, rows, max, single) {
+  el.innerHTML = rows.map(r => {
+    const total = r.a + (r.b || 0);
+    const wa = max ? r.a / max * 100 : 0, wb = max ? (r.b || 0) / max * 100 : 0;
+    return `<button type="button" class="bar-row" data-key="${esc(r.key)}" aria-pressed="${r.on ? 'true' : 'false'}"
+      aria-label="${esc(r.key)}：${single ? '' : `健保特約 ${r.a}、自費 ${r.b || 0}、`}合計 ${total} 間">
+      <span class="lab">${esc(r.key)}</span>
+      <span class="track">${r.a ? `<span class="seg a" style="width:${wa}%"></span>` : ''}${!single && r.b ? `<span class="seg b" style="width:${wb}%"></span>` : ''}</span>
+      <span class="val">${fmt(total)}</span></button>`;
+  }).join('');
+}
+
+function charts() {
+  cityPick = $('#fCity').value; // keep the county highlight in sync with the select
+  const byCity = {};
+  for (const c of all) {
+    if (!isOpen(c)) continue;
+    const k = c.city || '未知';
+    const o = byCity[k] || (byCity[k] = { key: k, a: 0, b: 0, dent: 0 });
+    c.status === '健保特約' ? o.a++ : o.b++;
+    o.dent += c.dentists || 0;
+  }
+  const rows = Object.values(byCity).sort((x, y) => (y.a + y.b) - (x.a + x.b));
+  const max = Math.max(...rows.map(r => r.a + r.b));
+  rows.forEach(r => r.on = r.key === cityPick);
+  barRows($('#cityBars'), rows, max, false);
+  const sum = rows.reduce((s, r) => s + r.a + r.b, 0);
+  $('#cityTable').innerHTML = rows.map(r => `<tr><td>${r.key}</td><td class="num mono">${fmt(r.a)}</td><td class="num mono">${fmt(r.b)}</td><td class="num mono">${fmt(r.a + r.b)}</td><td class="num mono">${fmt(r.dent)}</td></tr>`).join('');
+  bindTips($('#cityBars'), k => { const r = byCity[k]; const t = r.a + r.b;
+    return `<b>${esc(k)}</b><div class="r"><span><i style="background:var(--series-1)"></i>健保特約</span><span class="mono">${fmt(r.a)}</span></div>
+      <div class="r"><span><i style="background:var(--series-2)"></i>自費</span><span class="mono">${fmt(r.b)}</span></div>
+      <div class="r"><span>合計</span><span class="mono">${fmt(t)}（全台 ${(t / sum * 100).toFixed(1)}%）</span></div>
+      <div class="r"><span>牙醫師</span><span class="mono">${fmt(r.dent)}</span></div>`; });
+  districtChart();
+}
+
+function districtChart() {
+  const city = $('#fCity').value;
+  const src = all.filter(c => isOpen(c) && (!city || c.city === city));
+  const by = {};
+  for (const c of src) { const k = city ? (c.district || '未知') : (c.city || '未知') + (c.district || ''); (by[k] = by[k] || { key: k, a: 0 }).a++; }
+  const rows = Object.values(by).sort((x, y) => y.a - x.a);
+  const top = rows.slice(0, 15), dist = $('#fDist').value;
+  top.forEach(r => r.on = city && r.key === dist);
+  $('#distTitle').textContent = city ? `${city} 各區診所數` : '診所最多的鄉鎮市區';
+  $('#distSub').textContent = city ? `共 ${rows.length} 區${rows.length > 15 ? '，顯示前 15' : ''}` : '全台前 15 名 · 先在左側選縣市可看該縣市各區';
+  barRows($('#distBars'), top, top.length ? top[0].a : 0, true);
+  bindTips($('#distBars'), k => `<b>${esc(k)}</b><div class="r"><span>營業中診所</span><span class="mono">${fmt(by[k].a)}</span></div>`);
+}
+
+function bindTips(el, html) {
+  el.onmousemove = e => { const b = e.target.closest('.bar-row'); b ? showTip(e, html(b.dataset.key)) : hideTip(); };
+  el.onmouseleave = hideTip;
+  el.onfocusin = e => { const b = e.target.closest('.bar-row'); if (b) { const r = b.getBoundingClientRect(); showTip({ clientX: r.left + 60, clientY: r.bottom }, html(b.dataset.key)); } };
+  el.onfocusout = hideTip;
+}
+$('#cityBars').addEventListener('click', e => {
+  const b = e.target.closest('.bar-row'); if (!b) return;
+  const k = b.dataset.key;
+  $('#fCity').value = $('#fCity').value === k ? '' : k; fillDistricts(); $('#fDist').value = '';
+  onFilter(true);
+});
+$('#distBars').addEventListener('click', e => {
+  const b = e.target.closest('.bar-row'); if (!b) return;
+  if ($('#fCity').value) { $('#fDist').value = $('#fDist').value === b.dataset.key ? '' : b.dataset.key; }
+  else { const c = CITIES.find(x => b.dataset.key.startsWith(x)); if (c) { $('#fCity').value = c; fillDistricts(); $('#fDist').value = b.dataset.key.slice(c.length); } }
+  onFilter(true);
+});
+
+/* ---------- filtering ---------- */
+function fillDistricts() {
+  const city = $('#fCity').value, sel = $('#fDist');
+  const ds = [...new Set(all.filter(c => c.city === city && c.district).map(c => c.district))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  sel.innerHTML = '<option value="">全部區域</option>' + ds.map(d => `<option>${esc(d)}</option>`).join('');
+  sel.disabled = !city;
+}
+function apply() {
+  const terms = $('#q').value.trim().toLowerCase().replace(/台/g, '臺').split(/\s+/).filter(Boolean);
+  const qd = digits($('#q').value);
+  const city = $('#fCity').value, dist = $('#fDist').value, st = $('#fStatus').value;
+  const f = {}; document.querySelectorAll('.checks input').forEach(i => f[i.dataset.f] = i.checked);
+  view = all.filter(c => {
+    if (st === 'open' ? !isOpen(c) : st && c.status !== st) return false;
+    if (city && c.city !== city) return false;
+    if (dist && c.district !== dist) return false;
+    if (f.website && !c.website) return false;
+    if (f.line && !c.line) return false;
+    if (f.rating && c.googleRating == null) return false;
+    if (f.taxId && !c.taxId) return false;
+    if (f.night && !night(c)) return false;
+    if (f.sat && !satOpen(c)) return false;
+    if (f.sun && !sunOpen(c)) return false;
+    if (f.multi && !(c.dentists >= 2)) return false;
+    if (terms.length && !terms.every(t => c._hay.includes(t)) && !(qd.length >= 4 && digits(c.phone).includes(qd))) return false;
+    return true;
+  });
+  const s = $('#sortSel').value, zh = (a, b) => a.localeCompare(b, 'zh-Hant');
+  const cmp = {
+    city: (a, b) => (CITIES.indexOf(a.city) - CITIES.indexOf(b.city)) || zh(a.district || '', b.district || '') || zh(a.name, b.name),
+    name: (a, b) => zh(a.name, b.name),
+    rating: (a, b) => (b.googleRating ?? -1) - (a.googleRating ?? -1) || (b.googleReviews || 0) - (a.googleReviews || 0),
+    reviews: (a, b) => (b.googleReviews || 0) - (a.googleReviews || 0),
+    dentists: (a, b) => (b.dentists || 0) - (a.dentists || 0) || zh(a.name, b.name),
+    since: (a, b) => (a.nhiSince || '99999999').localeCompare(b.nhiSince || '99999999'),
+    newest: (a, b) => (b.nhiSince || '').localeCompare(a.nhiSince || ''),
+  }[s];
+  view.sort(cmp);
+  $('#count').textContent = `找到 ${fmt(view.length)} 間診所`;
+  renderPage();
+}
+function onFilter(resetPage) { if (resetPage) page = 0; charts(); apply(); save(); }
+
+function renderPage() {
+  const pages = Math.max(1, Math.ceil(view.length / PAGE));
+  page = Math.min(page, pages - 1);
+  const slice = view.slice(page * PAGE, page * PAGE + PAGE);
+  $('#rows').innerHTML = slice.map(c => {
+    const badge = c.status === '健保特約' ? 'nhi' : c.status === '自費' ? 'self' : 'end';
+    const links = [
+      c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener">網站</a>` : '',
+      c.line ? `<a href="${esc(lineUrl(c.line))}" target="_blank" rel="noopener">LINE ${esc(c.line.startsWith('http') ? '' : c.line)}</a>` : '',
+      c.facebook ? `<a href="${esc(c.facebook)}" target="_blank" rel="noopener">FB</a>` : '',
+      `<a href="${esc(mapUrl(c))}" target="_blank" rel="noopener">地圖</a>`,
+    ].filter(Boolean).join('');
+    return `<tr data-code="${esc(c.code)}" tabindex="0">
+      <td><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.city || '')}${esc(c.district || '')}${c.owner ? ' · 負責人 ' + esc(c.owner) : ''}</div></td>
+      <td><div>${esc((c.address || '').replace(c.city || '', '').replace(c.district || '', ''))}</div><div class="sub mono">${c.phone ? `<a href="tel:${digits(c.phone)}">${esc(c.phone)}</a>` : ''}</div></td>
+      <td><span class="badge ${badge}">${esc(c.status)}</span></td>
+      <td class="num">${c.googleRating != null ? `<span class="star mono">${c.googleRating.toFixed(1)} ★</span><div class="sub mono">${fmt(c.googleReviews)} 則</div>` : '<span class="sub">—</span>'}</td>
+      <td class="num mono c-dent">${c.dentists ?? '—'}</td>
+      <td><div class="links">${links}</div></td>
+      <td class="mono sub c-code">${esc(c.code)}</td></tr>`;
+  }).join('');
+  $('#empty').hidden = view.length > 0;
+  const p = $('#pager');
+  if (pages <= 1) { p.innerHTML = ''; return; }
+  p.innerHTML = `<button class="btn sm" data-p="${page - 1}" ${page ? '' : 'disabled'}>上一頁</button>
+    <span class="mono">${page + 1} / ${pages}</span>
+    <button class="btn sm" data-p="${page + 1}" ${page < pages - 1 ? '' : 'disabled'}>下一頁</button>`;
+}
+$('#pager').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (!b || b.disabled) return; page = +b.dataset.p; renderPage(); $('#searchTitle').scrollIntoView({ behavior: 'smooth' }); });
+
+let qt;
+$('#q').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { page = 0; apply(); save(); }, 150); });
+$('#fCity').addEventListener('change', () => { fillDistricts(); onFilter(true); });
+['#fDist', '#fStatus'].forEach(s => $(s).addEventListener('change', () => onFilter(true)));
+$('#sortSel').addEventListener('change', () => { page = 0; apply(); save(); });
+document.querySelectorAll('.checks input').forEach(i => i.addEventListener('change', () => { page = 0; apply(); save(); }));
+$('#reset').addEventListener('click', () => {
+  $('#q').value = ''; $('#fCity').value = ''; fillDistricts(); $('#fStatus').value = 'open'; $('#sortSel').value = 'city';
+  document.querySelectorAll('.checks input').forEach(i => i.checked = false); onFilter(true);
+});
+
+
+/* per-viewer convenience: remember filters */
+function save() {
+  try { localStorage.setItem('dental:view', JSON.stringify({ q: $('#q').value, city: $('#fCity').value, dist: $('#fDist').value, st: $('#fStatus').value, sort: $('#sortSel').value,
+    f: [...document.querySelectorAll('.checks input:checked')].map(i => i.dataset.f) })); } catch (e) {}
+}
+function restore() {
+  fillDistricts();
+  try { const v = JSON.parse(localStorage.getItem('dental:view') || 'null'); if (!v) return;
+    $('#q').value = v.q || ''; $('#fCity').value = v.city || ''; fillDistricts(); $('#fDist').value = v.dist || '';
+    $('#fStatus').value = v.st ?? 'open'; $('#sortSel').value = v.sort || 'city';
+    document.querySelectorAll('.checks input').forEach(i => i.checked = (v.f || []).includes(i.dataset.f)); } catch (e) {}
+}
+
+/* ---------- detail ---------- */
+const dlg = $('#dlg'); let cur = null;
+function hoursGrid(h) {
+  if (!h) return '<span class="sub">未提供</span>';
+  const days = ['一','二','三','四','五','六','日'], parts = ['上午','下午','晚上'];
+  let out = '<div class="hours"><div class="h"></div>' + days.map(d => `<div class="h">${d}</div>`).join('');
+  parts.forEach((p, pi) => { out += `<div class="h">${p}</div>` + days.map((_, d) => h[d*3+pi] === '1' ? '<div class="on" aria-label="看診">●</div>' : '<div class="off" aria-label="休診">–</div>').join(''); });
+  return out + '</div>';
+}
+function openDetail(c) {
+  cur = c;
+  $('#dName').textContent = c.name;
+  const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+  const link = (u, t) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t || u)}</a>`;
+  $('#dBody').innerHTML = `<dl class="kv">
+    ${row('狀態', esc(c.status) + (c.nhiUntil ? `<span class="sub">（健保合約 ${ymd(c.nhiSince)} – ${ymd(c.nhiUntil)}）</span>` : ''))}
+    ${row('地址', esc(c.address))}
+    ${row('電話', c.phone ? `<a href="tel:${digits(c.phone)}" class="mono">${esc(c.phone)}</a>` : '')}
+    ${row('負責人', esc(c.owner))}
+    ${row('統一編號', c.taxId ? `<span class="mono">${esc(c.taxId)}</span>` : '')}
+    ${row('機構代碼', `<span class="mono">${esc(c.code)}</span>`)}
+    ${row('機構類別', esc(c.kind))}
+    ${row('診療科別', esc((c.specs || []).join('、')))}
+    ${row('人員', c.dentists != null ? `牙醫師 ${c.dentists} 位` + (c.staff ? `、護理 ${c.staff.nurses} 位、牙技 ${c.staff.techs} 位` : '') : '')}
+    ${row('Google', c.googleRating != null ? `${c.googleRating.toFixed(1)} ★（${fmt(c.googleReviews)} 則評論）<span class="sub"> · ${esc(c.googleFetched || '')}</span>` : '')}
+    ${row('網站', c.website ? link(c.website) : '')}
+    ${row('LINE', c.line ? link(lineUrl(c.line), c.line) : '')}
+    ${row('Facebook', c.facebook ? link(c.facebook) : '')}
+    ${row('Instagram', c.instagram ? link(c.instagram) : '')}
+    ${row('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
+    ${row('看診時段', hoursGrid(c.hours) + (c.hoursNote ? `<div class="sub" style="margin-top:4px">${esc(c.hoursNote)}</div>` : ''))}
+    ${row('資料來源', esc((c.sources || []).join('、')))}
+  </dl>
+  <p class="note">缺少的欄位（網站、LINE、統編、負責人）可到 GitHub 編輯 <code>data/dental-extra.csv</code> 補上，下次更新會自動合併。</p>`;
+  $('#dMap').href = mapUrl(c);
+  dlg.showModal();
+}
+$('#rows').addEventListener('click', e => { if (e.target.closest('a')) return; const tr = e.target.closest('tr[data-code]'); if (tr) openDetail(all.find(c => c.code === tr.dataset.code)); });
+$('#rows').addEventListener('keydown', e => { if (e.key !== 'Enter' || !e.target.matches('tr[data-code]')) return; openDetail(all.find(c => c.code === e.target.dataset.code)); });
+$('#dClose').addEventListener('click', () => dlg.close());
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+/* add to 我的診所名單 (clinics.html shares this site's IndexedDB) */
+function rosterDb() {
+  return new Promise((res, rej) => { const r = indexedDB.open('clinic-roster', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+$('#dAdd').addEventListener('click', async () => {
+  const c = cur; if (!c) return;
+  try {
+    const db = await rosterDb();
+    const list = await new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get('clinics'); q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error); });
+    if (list.some(x => x.code === c.code || (x.name === c.name && digits(x.phone) === digits(c.phone)))) { toast('「' + c.name + '」已在我的名單裡'); return; }
+    const now = new Date().toISOString();
+    list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: c.name, specs: ['牙科'], city: c.city || '', district: c.district || '',
+      address: c.address || '', phone: c.phone || '', mobile: '', doctor: c.owner || '', contact: '', email: c.email || '', website: c.website || '', code: c.code,
+      nhi: c.status === '健保特約' ? '是' : '否', hours: c.hoursNote || '', status: '潛在客戶', source: '全台牙醫診所資料庫', lastContact: '', nextFollow: '',
+      tags: c.line ? ['LINE ' + c.line] : [], notes: [c.taxId ? '統編 ' + c.taxId : '', c.googleRating != null ? `Google ${c.googleRating}★ (${c.googleReviews})` : ''].filter(Boolean).join('；'),
+      createdAt: now, updatedAt: now });
+    await new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(list, 'clinics'); t.oncomplete = res; t.onerror = () => rej(t.error); });
+    toast('已加入我的診所名單');
+  } catch (e) { toast('無法寫入名單：' + e.message); }
+});
+
+/* ---------- export ---------- */
+$('#exportBtn').addEventListener('click', () => {
+  if (!view.length) return toast('目前沒有資料可匯出');
+  // headers match clinics.html import so the file can be imported there directly
+  const H = ['診所名稱','科別','縣市','鄉鎮市區','地址','電話','負責醫師','Email','網站','醫事機構代碼','健保特約','門診時間','標籤','備註','統一編號','LINE','Facebook','Google評分','Google評論數','牙醫師人數','狀態說明'];
+  const days = ['一','二','三','四','五','六','日'], parts = ['上午','下午','晚上'];
+  const hrs = h => h ? days.map((d, i) => { const p = parts.filter((_, j) => h[i*3+j] === '1'); return p.length ? d + p.join('') : ''; }).filter(Boolean).join(' ') : '';
+  const cell = v => { v = String(v ?? ''); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const lines = [H.join(',')].concat(view.map(c => [c.name, (c.specs || []).join('、'), c.city, c.district, c.address, c.phone, c.owner, c.email, c.website, c.code,
+    c.status === '健保特約' ? '是' : '否', hrs(c.hours), '', c.hoursNote, c.taxId, c.line, c.facebook, c.googleRating, c.googleReviews, c.dentists, c.status].map(cell).join(',')));
+  saveFile(`牙醫診所_${$('#fCity').value || '全台'}_${new Date().toISOString().slice(0, 10)}.csv`, '\uFEFF' + lines.join('\r\n'), `已匯出 ${fmt(view.length)} 筆`);
+});
+
+// inside the claude.ai viewer, files go through its downloads capability; elsewhere a normal browser download
+let dlApi;
+if (window.claude && window.claude.use) window.claude.use('downloads').then(d => dlApi = d).catch(() => {});
+async function saveFile(name, text, okMsg) {
+  if (dlApi) {
+    try { await dlApi.save({ filename: name, data: new Blob([text], { type: 'text/csv' }) }); toast(okMsg); }
+    catch (e) { if (e && e.code !== 'declined') toast('無法下載：' + (e.message || e.code)); }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast(okMsg);
+}
+
+/* ---------- ERP feed ---------- */
+const erp = $('#erpDlg');
+$('#erpBtn').addEventListener('click', () => {
+  // the ERP needs a public, daily-updated address: use GitHub Pages unless this page is already served from there
+  const base = /github\.io$|^localhost$|^127\./.test(location.hostname) ? location.href : 'https://zero000ryu.github.io/isaac-Module-/dental.html';
+  const csv = new URL('data/dental.csv', base).href, json = new URL('data/dental.json', base).href;
+  $('#feedCsv').textContent = csv; $('#feedJson').textContent = json; $('#feedCsvA').href = csv;
+  erp.showModal();
+});
+erp.addEventListener('click', async e => {
+  if (e.target === erp || e.target.closest('[data-close]')) return erp.close();
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  const text = $('#' + b.dataset.copy).textContent;
+  try { await navigator.clipboard.writeText(text); toast('已複製網址'); }
+  catch (err) { const r = document.createRange(); r.selectNodeContents($('#' + b.dataset.copy)); getSelection().removeAllRanges(); getSelection().addRange(r); toast('請按 Ctrl+C 複製'); }
+});
+
+let tt;
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
+})();
+</script>
+</body>
+</html>

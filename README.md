@@ -39,6 +39,37 @@
 - 提供歐風古典、工業風、現代簡約三種風格，可切換斜角、鳥瞰和人視角
 - 可以調整牆高剖切，並擷取效果圖
 
+## 診所名單系統（`clinics.html`）
+從上方「診所名單」按鈕進入，或直接打開 `clinics.html`（網址：`https://zero000ryu.github.io/isaac-Module-/clinics.html`）。
+- 新增、編輯、刪除診所：名稱、科別（可複選）、縣市／區、地址、電話、負責醫師、聯絡人、Email、醫事機構代碼、健保特約、門診時間、標籤、備註
+- 狀態分為潛在客戶、洽談中、合作中、暫停，可記錄上次聯絡與下次追蹤日期；逾期或 7 天內要追蹤的會標色提醒
+- 關鍵字搜尋（電話可只打部分數字），依縣市、科別、狀態篩選，點欄位標題排序；新增時會提醒可能重複的診所
+- 匯入 Excel 另存的 CSV（UTF-8 或 Big5，欄位名稱自動對應，日期接受民國年）；合併模式只會更新檔案裡有填的欄位
+- 匯出 CSV、複製貼到 Excel、JSON 備份、列印
+- 資料存在這台裝置的瀏覽器裡（IndexedDB），換電腦前請先匯出 JSON 備份
+
+## 全台牙醫診所資料庫（`dental.html`）
+網址：`https://zero000ryu.github.io/isaac-Module-/dental.html`
+
+**儀表板**：營業中、健保特約、自費診所數，執業牙醫師人數；各縣市長條圖（點一下就篩選），以及各鄉鎮市區排名。
+**搜尋**：名稱、地址、電話、機構代碼、負責人、LINE；可依縣市／區、狀態、有網站／LINE／Google 評分／統編、晚上或週末看診篩選，依 Google 評分、評論數、牙醫師人數排序。點診所可看詳細資料與看診時段，並可「加入我的診所名單」。
+
+**資料來源與更新**（`.github/workflows/update-dental.yml`，每天台灣時間 03:23 自動執行，有變動才更新網站）
+| 欄位 | 來源 | 涵蓋率 |
+|---|---|---|
+| 名稱、地址、電話、看診時段、健保合約 | 健保署 健保特約醫事機構-診所（data.gov.tw/dataset/39283） | 全部健保特約牙醫 |
+| 自費診所、鄉鎮市區、牙醫師人數 | 衛福部 醫療機構與人員基本資料（data.gov.tw/dataset/15393） | 全部立案診所 |
+| 統一編號 | 財政部 全國營業(稅籍)登記（每週一比對） | 很低：醫療業免營業稅，多數診所沒有稅籍登記 |
+| Google 評分、評論數、網站 | Google Places API（`scripts/enrich_google.py`） | 需設定金鑰，見下方 |
+| LINE、Facebook、Email、負責人、統編 | 診所官網公開資訊（`scripts/enrich_web.py`，遵守 robots.txt） | 有網站的診所才有 |
+| 任何欄位的人工修正 | `data/dental-extra.csv`（以醫事機構代碼對應，優先採用） | — |
+
+**啟用 Google 評分**：到 Google Cloud 啟用「Places API (New)」並建立 API 金鑰，再到 GitHub repo 的 Settings → Secrets and variables → Actions 新增 `GOOGLE_MAPS_API_KEY`。每天預設查 30 間（約每月 900 次，在 Google 每月免費額度內），可用 repo 變數 `GOOGLE_LIMIT` 調高以加快輪完全部診所。Places API 會依用量計費，請先在 Google Cloud 設好預算上限；Google 的條款限制評分等內容的長期快取，使用前請自行確認。
+
+**ERP 串接**：頁面右上「ERP 串接」提供固定網址 `data/dental.csv`（UTF-8、中文欄名）與 `data/dental.json`，可在 erp.top-geng.com 設定排程匯入，以「醫事機構代碼」作為唯一鍵。
+
+**未收錄的來源**：牙醫師公會、牙醫師學會沒有公開的批次名冊；Google 地圖網頁不允許爬取，只能透過官方 API。
+
 ## 注意
 - 冷氣與全熱交換器的尺寸、能力建議只是參考，實際請以原廠型錄與技師評估為準
 - 管線路徑僅為示意
