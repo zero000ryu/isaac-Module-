@@ -151,6 +151,15 @@ table.bom td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:
 table.bom td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 table.bom tr.grp td{background:var(--accent-soft);font-weight:700;font-size:12px}
 
+.projlist{display:flex;flex-direction:column;gap:8px}
+.projrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px}
+.projrow.cur{border-color:var(--accent);background:var(--accent-soft)}
+.projrow input{border:1px solid transparent;background:transparent;font-weight:700;font-size:15px;padding:4px 6px;border-radius:6px;min-width:0;width:100%}
+.projrow input:hover,.projrow input:focus{border-color:var(--line);background:var(--panel)}
+.projrow .pmeta{grid-column:1;font-size:12px;color:var(--muted);padding-left:6px;font-variant-numeric:tabular-nums}
+.projrow .row{grid-column:2;grid-row:1 / span 2;justify-content:flex-end}
+@media (max-width:640px){ .projrow{grid-template-columns:minmax(0,1fr)} .projrow .row{grid-column:1;grid-row:auto;justify-content:flex-start} }
+
 /* 3D */
 .d3{width:100%;height:100%;max-width:none;border-radius:12px}
 .d3wrap{position:relative;flex:1;min-height:0;background:#222}
@@ -189,15 +198,17 @@ table.bom tr.grp td{background:var(--accent-soft);font-weight:700;font-size:12px
 </head>
 <body>
 
+<input type="file" id="bgPick" accept="image/*,application/pdf,.pdf" hidden>
 <header class="top">
   <div class="brand"><h1>平面設計大師</h1><span class="mark">Floor Plan Studio</span></div>
   <input id="planName" class="planname" type="text" value="我的平面圖" aria-label="專案名稱">
   <div class="actions">
     <button class="btn" id="undoBtn" title="復原 (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="lbl">復原</span></button>
     <button class="btn" id="redoBtn" title="重做 (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg><span class="lbl">重做</span></button>
-    <button class="btn" id="sampleBtn" title="載入範例兩房平面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg><span class="lbl">範例</span></button>
-    <button class="btn" id="newBtn" title="清空圖面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="lbl">新圖面</span></button>
-    <button class="btn" id="importBtn" title="匯入 JSON"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span class="lbl">匯入</span></button>
+    <button class="btn" id="projBtn" title="我的專案：新增、切換、複製"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="lbl">專案</span></button>
+    <button class="btn" id="bgBtn" title="匯入平面圖圖檔（JPG、PNG、PDF）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg><span class="lbl">匯入圖檔</span></button>
+    <button class="btn" id="newBtn" title="清空圖面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="lbl">清空</span></button>
+    <button class="btn" id="importBtn" title="匯入圖檔或圖面資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span class="lbl">匯入</span></button>
     <button class="btn" id="bomBtn" title="材料數量表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="lbl">數量表</span></button>
     <button class="btn" id="d3Btn" title="3D 效果圖"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg><span class="lbl">3D 效果圖</span></button>
     <button class="btn primary" id="exportBtn" title="匯出工程圖"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg><span class="lbl">出圖</span></button>
@@ -283,11 +294,27 @@ table.bom tr.grp td{background:var(--accent-soft);font-weight:700;font-size:12px
   </div>
 </div>
 
+<div class="modal" id="projModal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="projTitle">
+    <header><h3 id="projTitle">我的專案</h3><button class="btn" data-close>關閉</button></header>
+    <div class="body">
+      <div class="row"><button class="btn primary" id="projNew">新增空白專案</button><button class="btn" id="projNewImg">從平面圖圖檔建立</button><button class="btn" id="projSample">從範例建立</button></div>
+      <p>每個專案各自儲存在這台裝置的瀏覽器裡，修改會自動存檔。換電腦或備份時，請到「出圖」複製或下載 JSON。</p>
+      <div id="projList" class="projlist"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="importModal" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="impTitle">
     <header><h3 id="impTitle">匯入圖面</h3><button class="btn" data-close>關閉</button></header>
     <div class="body">
-      <p>選擇先前匯出的 .json 檔，或把 JSON 文字貼在下方。匯入會取代目前圖面，可以按復原還原。</p>
+      <div class="subhead" style="margin-top:0;border-top:0;padding-top:0">平面圖圖檔</div>
+      <p>支援 JPG、PNG、PDF（建商平面圖、權狀附圖、手繪照片）。匯入後會當作底圖，用「校正」對準實際尺寸，再照著描牆與房間。也可以把圖片直接拖到畫布上，或複製圖片後按 Ctrl+V 貼上。</p>
+      <div class="row"><button class="btn primary" id="impImg">選擇平面圖圖檔</button></div>
+      <div class="subhead">圖面資料（JSON）</div>
+      <p>選擇先前匯出的 .json 檔，或把 JSON 文字貼在下方。</p>
+      <label class="check"><input type="checkbox" id="impAsNew" checked> 匯入成新專案（不勾選則取代目前圖面，可按復原還原）</label>
       <input type="file" id="impFile" accept=".json,application/json">
       <textarea id="impText" placeholder='{"walls":[...],"rooms":[...],"items":[...]}' aria-label="貼上 JSON"></textarea>
       <div class="row"><button class="btn primary" id="impGo">匯入</button></div>
@@ -632,24 +659,115 @@ function pipeVis(p, sk=sheet){ return SHEETS[sk].v[(PIPES[p.kind]||PIPES.cw).L] 
 /* =========================================================
    4. History & persistence
    ========================================================= */
-function checkpoint(){ undoStack.push(JSON.stringify(doc)); if(undoStack.length>150) undoStack.shift(); redoStack = []; updateUndo(); }
-function undo(){ if(!undoStack.length) return; redoStack.push(JSON.stringify(doc)); doc = JSON.parse(undoStack.pop()); afterHistory(); }
-function redo(){ if(!redoStack.length) return; undoStack.push(JSON.stringify(doc)); doc = JSON.parse(redoStack.pop()); afterHistory(); }
+const bgRefs = new Map(), bgSrcs = {};
+function packDoc(){ return JSON.stringify(doc, (k,v) => { if(k==='src' && typeof v==='string' && v.length > 2000){ let r = bgRefs.get(v); if(!r){ r = 'bgref:'+bgRefs.size; bgRefs.set(v,r); bgSrcs[r] = v; } return r; } return v; }); }
+function unpackDoc(str){ const d = JSON.parse(str); if(d.bg && bgSrcs[d.bg.src]) d.bg.src = bgSrcs[d.bg.src]; return d; }
+function checkpoint(){ undoStack.push(packDoc()); if(undoStack.length>150) undoStack.shift(); redoStack = []; updateUndo(); }
+function undo(){ if(!undoStack.length) return; redoStack.push(packDoc()); doc = unpackDoc(undoStack.pop()); afterHistory(); }
+function redo(){ if(!redoStack.length) return; undoStack.push(packDoc()); doc = unpackDoc(redoStack.pop()); afterHistory(); }
 function afterHistory(){ if(sel && !getSel()) sel = null; poly = null; render(); renderProps(); save(); updateUndo(); }
 function updateUndo(){ $('#undoBtn').disabled = !undoStack.length; $('#redoBtn').disabled = !redoStack.length; }
-let saveT = 0;
+/* Projects: each saved separately in IndexedDB (localStorage fallback) */
+const store = (() => {
+  let dbp = null;
+  const idb = () => dbp || (dbp = new Promise((res, rej) => { try { const r = indexedDB.open('fpmaster', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch(e){ rej(e); } }));
+  const run = (mode, fn) => idb().then(db => new Promise((res, rej) => { const t = db.transaction('kv', mode), q = fn(t.objectStore('kv')); t.oncomplete = () => res(q && q.result); t.onerror = t.onabort = () => rej(t.error); }));
+  const ls = {
+    get: k => { try { const v = localStorage.getItem('fpm:'+k); return v ? JSON.parse(v) : undefined; } catch(e){ return undefined; } },
+    set: (k,v) => { localStorage.setItem('fpm:'+k, JSON.stringify(v)); },
+    del: k => { try { localStorage.removeItem('fpm:'+k); } catch(e){} },
+  };
+  return {
+    get: k => run('readonly', st => st.get(k)).catch(() => ls.get(k)),
+    set: (k,v) => run('readwrite', st => st.put(v,k)).catch(() => ls.set(k,v)),
+    del: k => run('readwrite', st => st.delete(k)).catch(() => ls.del(k)),
+  };
+})();
+let projects = {current:null, list:[]};
+const docSummary = d => ({rooms:d.rooms.length, area:d.rooms.reduce((s,r)=>s+r.w*r.h,0)/10000});
+let saveT = 0, saveWarned = false;
 function save(){
-  clearTimeout(saveT);
-  saveT = setTimeout(() => { try { localStorage.setItem('fpmaster.v2', JSON.stringify({doc, name:$('#planName').value, settings})); } catch(e){ /* storage full or blocked */ } }, 300);
+  clearTimeout(saveT); saveT = setTimeout(flushSave, 400);
   renderSummary(); renderLegend();
 }
-function load(){
-  try {
-    const raw = localStorage.getItem('fpmaster.v2') || localStorage.getItem('fpmaster.v1'); if(!raw) return false;
-    const d = JSON.parse(raw); if(!d || !d.doc) return false;
-    doc = sanitize(d.doc); if(d.name) $('#planName').value = d.name; if(d.settings) Object.assign(settings, d.settings); return true;
-  } catch(e){ return false; }
+async function flushSave(){
+  clearTimeout(saveT);
+  if(!projects.current) return;
+  const name = $('#planName').value.trim() || '未命名專案';
+  const meta = projects.list.find(p => p.id===projects.current);
+  if(meta) Object.assign(meta, {name, updated:Date.now()}, docSummary(doc));
+  try { await store.set('proj:'+projects.current, {doc, name, settings}); await store.set('index', projects); saveWarned = false; }
+  catch(e){ if(!saveWarned){ toast('瀏覽器儲存空間不足：請到「出圖」備份 JSON，或刪除不用的專案'); saveWarned = true; } }
 }
+async function openProject(id, preloaded){
+  const data = preloaded || await store.get('proj:'+id).catch(() => null);
+  if(!data){ toast('找不到這個專案的資料'); return false; }
+  projects.current = id;
+  doc = sanitize(data.doc || {}); $('#planName').value = data.name || '未命名專案';
+  if(data.settings) settings = {...settings, ...data.settings};
+  undoStack = []; redoStack = []; sel = null; poly = null; calib = null; draft = null;
+  store.set('index', projects).catch(() => {});
+  updateUndo(); setSheet('all'); setTool('select'); renderProps(); renderSummary(); requestAnimationFrame(fit);
+  return true;
+}
+async function createProject(name, d){
+  await flushSave();
+  const id = 'p' + Date.now().toString(36) + uid().slice(0,3);
+  projects.list.unshift({id, name, updated:Date.now(), ...docSummary(d)});
+  const data = {doc:d, name, settings};
+  try { await store.set('proj:'+id, data); } catch(e){ toast('瀏覽器儲存空間不足，新專案可能無法保存'); }
+  await openProject(id, data);
+  if(!$('#projModal').hidden) renderProjects();
+}
+async function initProjects(){
+  const idx = await store.get('index').catch(() => null);
+  if(idx && Array.isArray(idx.list) && idx.list.length){
+    projects = idx;
+    const first = idx.list.some(p => p.id===idx.current) ? idx.current : idx.list[0].id;
+    if(await openProject(first)) return;
+  }
+  let old = null; try { old = JSON.parse(localStorage.getItem('fpmaster.v2') || localStorage.getItem('fpmaster.v1') || 'null'); } catch(e){}
+  projects = {current:null, list:[]};
+  if(old && old.doc){ if(old.settings) Object.assign(settings, old.settings); await createProject(old.name || '我的平面圖', sanitize(old.doc)); return; }
+  doc = sample(); autoDims(true); await createProject('範例：兩房一廳', doc);
+}
+const fmtDate = t => { const d = new Date(t||Date.now()); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+function renderProjects(){
+  $('#projList').innerHTML = projects.list.map(p => `<div class="projrow${p.id===projects.current?' cur':''}" data-pid="${p.id}">`
+    + `<input type="text" value="${esc(p.name)}" aria-label="專案名稱" data-rename>`
+    + `<span class="pmeta mono">${((p.area||0)/PING).toFixed(1)} 坪 · ${p.rooms||0} 個房間 · 更新 ${fmtDate(p.updated)}</span>`
+    + `<div class="row">${p.id===projects.current ? '<span class="tag">目前專案</span>' : '<button class="btn primary" data-open>開啟</button>'}<button class="btn" data-copy>複製</button><button class="btn danger" data-del>刪除</button></div></div>`).join('');
+  $('#projList').querySelectorAll('.projrow').forEach(row => {
+    const id = row.dataset.pid, meta = projects.list.find(p => p.id===id);
+    row.querySelector('[data-rename]').addEventListener('change', async e => {
+      const name = e.target.value.trim() || '未命名專案'; meta.name = name;
+      if(id===projects.current){ $('#planName').value = name; await flushSave(); }
+      else { const d = await store.get('proj:'+id).catch(() => null); if(d){ d.name = name; await store.set('proj:'+id, d).catch(() => {}); } await store.set('index', projects).catch(() => {}); }
+      toast('已重新命名');
+    });
+    const op = row.querySelector('[data-open]');
+    if(op) op.addEventListener('click', async () => { await flushSave(); if(await openProject(id)){ closeModals(); toast(`已開啟「${meta.name}」`); } });
+    row.querySelector('[data-copy]').addEventListener('click', async () => {
+      if(id===projects.current) await flushSave();
+      const d = await store.get('proj:'+id).catch(() => null); if(!d){ toast('找不到這個專案的資料'); return; }
+      await createProject(meta.name + ' 複本', sanitize(clone(d.doc))); toast('已複製並開啟複本');
+    });
+    const del = row.querySelector('[data-del]');
+    del.addEventListener('click', async () => {
+      if(del.dataset.armed !== '1'){ del.dataset.armed = '1'; del.textContent = '確定刪除？'; setTimeout(() => { if(del.isConnected){ del.dataset.armed = ''; del.textContent = '刪除'; } }, 3500); return; }
+      projects.list = projects.list.filter(p => p.id!==id);
+      await store.del('proj:'+id).catch(() => {});
+      if(id===projects.current){
+        projects.current = null;
+        if(projects.list.length) await openProject(projects.list[0].id);
+        else await createProject('新專案', emptyDoc());
+      }
+      await store.set('index', projects).catch(() => {});
+      renderProjects(); toast(`已刪除「${meta.name}」`);
+    });
+  });
+}
+async function openProjects(){ await flushSave(); renderProjects(); $('#projModal').hidden = false; }
 function sanitize(d){
   const o = emptyDoc();
   for(const k of ['walls','rooms','items','labels','dims','pipes']) if(Array.isArray(d[k])) o[k] = d[k].filter(x => x && typeof x === 'object').map(x => ({...x, id: x.id ? String(x.id) : uid()}));
@@ -906,8 +1024,8 @@ function pipeSVG(p, scale, showLabel){
 }
 function planMarkup(scale, sk, forExport=false){
   const S = SHEETS[sk], fs = (base, px) => r1(Math.max(base, px/scale)), lowZoom = !forExport && scale < 0.2;
-  let s = (!forExport && doc.bg) ? `<image href="${doc.bg.src}" x="${doc.bg.x}" y="${doc.bg.y}" width="${r1(doc.bg.w)}" height="${r1(doc.bg.h)}" opacity="${doc.bg.opacity}" preserveAspectRatio="none" pointer-events="none"/>` : '';
-  s += '<g class="rooms">';
+  const bgImg = (!forExport && doc.bg) ? `<image href="${doc.bg.src}" x="${doc.bg.x}" y="${doc.bg.y}" width="${r1(doc.bg.w)}" height="${r1(doc.bg.h)}" opacity="${doc.bg.opacity}" preserveAspectRatio="none" pointer-events="none" style="mix-blend-mode:multiply"/>` : '';
+  let s = '<g class="rooms">';
   let roomText = '<g pointer-events="none">';
   for(const r of doc.rooms){
     const fl = FLOORS[r.floor] && r.floor!=='none' ? FLOORS[r.floor] : null, ce = CEILS[r.ceil||'flat'] || CEILS.flat;
@@ -926,7 +1044,7 @@ function planMarkup(scale, sk, forExport=false){
     if(f2*scale >= 6.5 || forExport) roomText += `<text class="room-area${S.floor===2||S.ceil?'':' mono'}" x="${r1(cx)}" y="${r1(cy+f1*.75)}" font-size="${f2}">${esc(line2)}</text>`;
   }
   roomText += '</g>';
-  s += '</g><g class="walls">';
+  s += '</g>' + bgImg + '<g class="walls">';
   for(const w of doc.walls) s += `<polygon class="wout" points="${wallPoly(w)}"/>`;
   for(const w of doc.walls){
     const m = wallMat(w), fill = m.fill.startsWith('url') && lowZoom ? 'var(--planbg)' : m.fill;
@@ -1118,8 +1236,9 @@ function renderPlanSettings(el){
     + (doc.bg
       ? numField('底圖寬','bgw',doc.bg.w) + `<div class="field"><label for="p_bgo">透明度</label><input type="range" id="p_bgo" min="5" max="100" value="${Math.round(doc.bg.opacity*100)}"></div>`
         + `<p class="empty">用「校正」在底圖上點兩個已知距離的點（例如標示 420 的牆兩端），輸入實際尺寸，比例就會對齊。</p>`
-        + `<div class="row"><button class="btn primary" data-go="cal">兩點校正</button><button class="btn danger" id="bgDel">移除底圖</button></div>`
-      : `<p class="empty">上傳房子的平面圖（建商圖、手繪照片皆可），校正比例後照著描牆與房間。也可以把圖片直接拖到畫布上。</p><input type="file" id="bgFile" accept="image/*" aria-label="上傳底圖"><div class="row"><button class="btn" data-go="cal">兩點校正已畫的圖</button></div>`)
+        + `<div class="pair">${numField('X','bgx',doc.bg.x)}${numField('Y','bgy',doc.bg.y)}</div>`
+        + `<div class="row"><button class="btn primary" data-go="cal">兩點校正</button><button class="btn" id="bgRot">旋轉 90°</button><button class="btn" id="bgRe">換一張</button><button class="btn danger" id="bgDel">移除底圖</button></div>`
+      : `<p class="empty">上傳房子的平面圖（建商圖、手繪照片皆可），校正比例後照著描牆與房間。也可以把圖片直接拖到畫布上。</p><div class="row"><button class="btn primary" id="bgRe">匯入平面圖圖檔</button></div><p class="empty">支援 JPG、PNG、PDF。</p><div class="row"><button class="btn" data-go="cal">兩點校正已畫的圖</button></div>`)
     + `<div class="subhead">丈量與尺寸</div>`
     + `<div class="row"><button class="btn" id="autoDim">自動標註外圍尺寸</button><button class="btn" data-go="dim">手動丈量</button></div>`
     + `<div class="subhead">新牆預設</div>`
@@ -1139,8 +1258,9 @@ function renderPlanSettings(el){
     const c = viewCenter();
     draft = {type:'room', x1:sn(c.x-w/2), y1:sn(c.y-h/2), x2:sn(c.x-w/2)+w, y2:sn(c.y-h/2)+h}; commitDraft(); render();
   });
-  const bf = el.querySelector('#bgFile');
-  if(bf) bf.addEventListener('change', e => loadBg(e.target.files[0]));
+  const re = el.querySelector('#bgRe'); if(re) re.addEventListener('click', () => $('#bgPick').click());
+  const rt = el.querySelector('#bgRot'); if(rt) rt.addEventListener('click', rotateBg);
+  el.querySelectorAll('[data-k=bgx],[data-k=bgy]').forEach(i => i.addEventListener('change', () => { const v = +i.value; if(!isFinite(v)) return; checkpoint(); doc.bg[i.dataset.k==='bgx'?'x':'y'] = v; commit(); }));
   const bw = el.querySelector('[data-k=bgw]');
   if(bw) bw.addEventListener('change', () => { const v = +bw.value; if(!(v>0)) return; checkpoint(); doc.bg.h = r1(doc.bg.h*v/doc.bg.w); doc.bg.w = v; commit(); });
   const bo = el.querySelector('#p_bgo');
@@ -1148,17 +1268,64 @@ function renderPlanSettings(el){
   const bd = el.querySelector('#bgDel');
   if(bd) bd.addEventListener('click', () => { checkpoint(); delete doc.bg; commit(); toast('已移除底圖'); });
 }
-function loadBg(f){
-  if(!f) return; const rd = new FileReader();
-  rd.onload = () => { const im = new Image(); im.onload = () => {
-    const cv = document.createElement('canvas'), k = Math.min(1, 2000/Math.max(im.width, im.height));
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const ex = document.querySelector(`script[data-src="${src}"]`);
+    if(ex){ if(ex.dataset.ok) res(); else { ex.addEventListener('load', () => res()); ex.addEventListener('error', () => rej(new Error('load'))); } return; }
+    const sc = document.createElement('script'); sc.src = src; sc.dataset.src = src;
+    sc.onload = () => { sc.dataset.ok = '1'; res(); }; sc.onerror = () => rej(new Error('load')); document.head.appendChild(sc);
+  });
+}
+async function pdfToImage(f){
+  await loadScript(PDFJS + 'pdf.min.js'); await loadScript(PDFJS + 'pdf.worker.min.js');
+  const lib = window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+  const pdf = await lib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+  const page = await pdf.getPage(1);
+  const v0 = page.getViewport({scale:1}), vp = page.getViewport({scale:Math.min(4, 2400/Math.max(v0.width, v0.height))});
+  const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,cv.width,cv.height);
+  await page.render({canvasContext:g, viewport:vp}).promise;
+  return {src:cv.toDataURL('image/jpeg', .9), pages:pdf.numPages};
+}
+function imageToBg(src, note){
+  const im = new Image();
+  im.onload = () => {
+    const cv = document.createElement('canvas'), k = Math.min(1, 2400/Math.max(im.width, im.height));
     cv.width = Math.round(im.width*k); cv.height = Math.round(im.height*k);
     const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,cv.width,cv.height); g.drawImage(im,0,0,cv.width,cv.height);
-    let src; try { src = cv.toDataURL('image/jpeg', .85); } catch(_){ src = rd.result; }
-    checkpoint(); doc.bg = {src, x:0, y:0, w:1000, h:r1(1000*im.height/im.width), opacity:.55};
-    commit(); fit(); setTool('cal');
-    toast('底圖已載入。請在圖上點兩個已知距離的點來校正比例');
-  }; im.src = rd.result; }; rd.readAsDataURL(f);
+    let out; try { out = cv.toDataURL('image/jpeg', .88); } catch(_){ out = src; }
+    checkpoint(); doc.bg = {src:out, x:0, y:0, w:1000, h:r1(1000*im.height/im.width), opacity:.55};
+    closeModals(); commit(); fit(); setTool('cal'); togglePanel('prop', false);
+    toast(`${note ? note + '。' : ''}底圖已載入：請在圖上點兩個已知距離的點（例如標示尺寸的牆兩端）來校正比例`);
+  };
+  im.onerror = () => toast('無法讀取這個圖檔，請改存成 JPG 或 PNG 再匯入');
+  im.src = src;
+}
+async function loadBg(f){
+  if(!f) return;
+  if(f.type==='application/pdf' || /\.pdf$/i.test(f.name||'')){
+    toast('正在讀取 PDF…');
+    try { const r = await pdfToImage(f); imageToBg(r.src, r.pages > 1 ? `PDF 共 ${r.pages} 頁，已使用第 1 頁` : ''); }
+    catch(e){ toast('PDF 讀取失敗，請改存成 JPG 或 PNG 再匯入'); }
+    return;
+  }
+  const rd = new FileReader();
+  rd.onload = () => imageToBg(rd.result);
+  rd.onerror = () => toast('無法讀取這個檔案');
+  rd.readAsDataURL(f);
+}
+function rotateBg(){
+  const b = doc.bg; if(!b) return;
+  const im = new Image();
+  im.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = im.height; cv.height = im.width;
+    const g = cv.getContext('2d'); g.translate(cv.width, 0); g.rotate(Math.PI/2); g.drawImage(im, 0, 0);
+    checkpoint(); const cx = b.x + b.w/2, cy = b.y + b.h/2;
+    doc.bg = {...b, src:cv.toDataURL('image/jpeg', .88), w:b.h, h:b.w, x:r1(cx - b.h/2), y:r1(cy - b.w/2)};
+    commit();
+  };
+  im.src = b.src;
 }
 function renderCalib(el){
   const d = Math.hypot(calib.p2.x-calib.p1.x, calib.p2.y-calib.p1.y);
@@ -1517,7 +1684,7 @@ svg.addEventListener('dragover', e => e.preventDefault());
 svg.addEventListener('drop', e => {
   e.preventDefault();
   const f = e.dataTransfer.files && e.dataTransfer.files[0];
-  if(f && /^image\//.test(f.type)){ loadBg(f); return; }
+  if(f && (/^image\//.test(f.type) || f.type==='application/pdf' || /\.pdf$/i.test(f.name))){ loadBg(f); return; }
   addItem(libDef(e.dataTransfer.getData('text/plain')), toWorld(e));
 });
 function libDef(key){ const [ci,ii] = String(key).split(':').map(Number); return CATALOG[ci] && CATALOG[ci].items[ii]; }
@@ -1571,7 +1738,20 @@ $('#redoBtn').addEventListener('click', redo);
 $('#finishPoly').addEventListener('click', finishPoly);
 $('#planName').addEventListener('change', save);
 $('#newBtn').addEventListener('click', () => { checkpoint(); const meta = doc.meta; doc = emptyDoc(); doc.meta = meta; sel = null; poly = null; calib = null; commit(); view = {x:60,y:60,s:0.6}; render(); toast('已清空圖面，可按復原還原'); });
-$('#sampleBtn').addEventListener('click', () => { checkpoint(); doc = sample(); autoDims(true); sel = null; calib = null; commit(); fit(); toast('已載入範例：兩房一廳（約 27 坪）'); });
+$('#projBtn').addEventListener('click', openProjects);
+$('#projNew').addEventListener('click', async () => { await createProject('新專案', emptyDoc()); closeModals(); toast('已建立新專案，可在左上角修改名稱'); });
+$('#projSample').addEventListener('click', async () => { const d = sample(); const keep = doc; doc = d; autoDims(true); doc = keep; await createProject('範例：兩房一廳', d); closeModals(); toast('已建立範例專案'); });
+$('#projNewImg').addEventListener('click', async () => { await createProject('新專案', emptyDoc()); closeModals(); $('#bgPick').click(); });
+$('#bgBtn').addEventListener('click', () => $('#bgPick').click());
+$('#bgPick').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; loadBg(f); });
+$('#impImg').addEventListener('click', () => $('#bgPick').click());
+document.addEventListener('paste', e => {
+  if(/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(x => /^image\//.test(x.type) || x.type==='application/pdf');
+  if(f){ e.preventDefault(); loadBg(f); }
+});
+window.addEventListener('pagehide', () => { flushSave(); });
+document.addEventListener('visibilitychange', () => { if(document.hidden) flushSave(); });
 $('#sheetSel').innerHTML = Object.entries(SHEETS).map(([k,s]) => `<option value="${k}">${s.no ? s.no+' ' : ''}${s.n}</option>`).join('');
 $('#sheetSel').addEventListener('change', e => setSheet(e.target.value));
 $('#pipeKind').innerHTML = Object.entries(PIPES).map(([k,p]) => `<option value="${k}">${p.sh}　${p.n}</option>`).join('');
@@ -1706,6 +1886,7 @@ $('#impGo').addEventListener('click', () => {
   try {
     const d = JSON.parse($('#impText').value);
     if(!d || !(Array.isArray(d.walls) || Array.isArray(d.rooms) || Array.isArray(d.items))) throw new Error('shape');
+    if($('#impAsNew').checked){ closeModals(); createProject(d.name || '匯入的專案', sanitize(d)).then(() => toast('已匯入成新專案')); return; }
     checkpoint(); doc = sanitize(d); if(d.name) $('#planName').value = d.name; sel = null; commit(); fit(); closeModals(); toast('已匯入圖面');
   } catch(err){ toast('無法讀取：請確認內容是本工具匯出的 JSON'); }
 });
@@ -2097,9 +2278,8 @@ function sample(){
    ========================================================= */
 $('#patDefs').innerHTML = patDefs();
 renderLib();
-if(!load()){ doc = sample(); autoDims(true); }
 setSheet('all'); setTool('select'); renderProps(); renderSummary(); updateUndo();
-requestAnimationFrame(fit);
+initProjects();
 window.addEventListener('resize', () => render());
 })();
 </script>
