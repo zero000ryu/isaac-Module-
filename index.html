@@ -1947,7 +1947,7 @@ const STYLES = {
   industrial:{n:'工業風', d:'清水模牆面、紅磚外牆、水泥粉光地坪、黑鐵件、皮革沙發與裸燈泡吊燈。', bg:0x2b2a28, ground:0x3a3835, wall:'#a4a19b', wallTex:'concrete', ext:'brick',
     floor:['cement','#8f8b85'], wet:['tile','#5e5c58'], wood:'#5a3d29', fab:'#7a5236', fab2:'#3b3b3b', metal:'#1d1d1d', top:'#3f3c39', cab:'#4a3426', rug:'#6b6560', light:0xffc07a, pend:'edison', exposure:1.15},
   modern:{n:'現代簡約', d:'純白牆面、大板磚地坪、淺木與白色系統櫃、灰色布沙發、線型燈光。', bg:0xeef0f1, ground:0xdde1e3, wall:'#f6f6f4',
-    floor:['tile','#dedcd7'], wet:['tile','#c7c7c4'], wood:'#c8a57a', fab:'#c9c8c4', fab2:'#3c4044', metal:'#2a2a2a', top:'#f2f2f0', cab:'#f1f0ed', rug:'#bdbab3', light:0xfff3e2, pend:'linear', wallTex:null, ext:null, exposure:1.0},
+    floor:['tile','#cfcac2'], wet:['tile','#b9b8b4'], wood:'#b48c5e', fab:'#a9a7a2', fab2:'#3c4044', metal:'#2a2a2a', top:'#e9e8e4', cab:'#e8e6e1', rug:'#8f8b84', light:0xfff3e2, pend:'linear', wallTex:null, ext:null, exposure:.82},
 };
 let d3 = null, d3style = 'modern', d3view = 'iso';
 function texFor(kind, color){
@@ -2130,7 +2130,7 @@ function build3D(){
     const g = furn3D(it, st, H); if(g) scene.add(g);
     if(['downlight','ceilinglamp','pendant','chandelier','track','linear','walllamp'].includes(it.type)) lightsAt.push(it);
   }
-  scene.add(new THREE.HemisphereLight(0xffffff, st.ground, d3style==='industrial' ? .45 : .6));
+  scene.add(new THREE.HemisphereLight(0xffffff, st.ground, d3style==='industrial' ? .45 : d3style==='modern' ? .42 : .55));
   scene.add(new THREE.AmbientLight(0xffffff, .12));
   const sun = new THREE.DirectionalLight(0xfff6ea, d3style==='industrial' ? .55 : .7);
   sun.position.set(cx - span*.6, span*1.4, cz - span*.9); sun.target.position.set(cx, 0, cz);
@@ -2146,7 +2146,8 @@ function build3D(){
 }
 function setView(v){
   d3view = v; const s = d3.span;
-  if(v==='iso') Object.assign(d3.cam, {theta:-.75, phi:.92, r:s*1.25, tx:d3.center.x, tz:d3.center.z, ty:40});
+  if(v==='iso'){ const b = bbox({bg:false, dims:false}), tall = b.h > b.w*1.3, wide = b.w > b.h*1.3;
+    Object.assign(d3.cam, {theta: tall ? -.35 : wide ? -1.2 : -.75, phi:.62, r:s*1.3, tx:d3.center.x, tz:d3.center.z, ty:20}); }
   if(v==='top') Object.assign(d3.cam, {theta:0, phi:.02, r:s*1.35, tx:d3.center.x, tz:d3.center.z, ty:0});
   if(v==='eye'){ const r = doc.rooms.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0]; Object.assign(d3.cam, {theta:-.6, phi:1.42, r:Math.max(150, r ? Math.min(r.w,r.h)*.55 : 200), tx:r ? r.x+r.w/2 : d3.center.x, tz:r ? r.y+r.h/2 : d3.center.z, ty:150}); }
   document.querySelectorAll('#viewGrp button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view===v));
