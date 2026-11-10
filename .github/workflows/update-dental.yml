@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - id: day
+        run: echo "dom=$(TZ=Asia/Taipei date +%d)" >> "$GITHUB_OUTPUT"
       - name: Build from government open data
         run: |
           # tax registry is big and changes slowly: scan it on Mondays or when asked
@@ -49,6 +51,9 @@ jobs:
           python scripts/fetch_dentists.py --limit 800 --workers 2
       - name: NHI clinic details - programmes, fee, accessibility, current phone and address (incremental)
         run: python scripts/fetch_nhi_detail.py --limit 800 --workers 2
+      - name: Taipei Dental Association directory, 院長 (monthly, about 50 minutes)
+        if: ${{ github.event_name == 'workflow_dispatch' || startsWith(steps.day.outputs.dom, '01') }}
+        run: python scripts/fetch_tda.py
       - name: Merge and cross-check all sources
         run: python scripts/build_dental.py --cache
       - id: commit
