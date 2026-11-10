@@ -13,7 +13,7 @@ Together these cover most, not all, dentists. Results go to data/dentists.json k
 Polite by design: sequential requests with a delay, and --limit / --max-age-days so a run only
 refreshes the oldest part of the data.
 """
-import argparse, datetime as dt, io, json, os, re, sys, time, urllib.request
+import argparse, concurrent.futures as cf, datetime as dt, io, json, os, re, sys, time, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
@@ -37,6 +37,12 @@ def call(path, body=None, tries=3):
                 raise
             print('  retry', path, repr(e)[:120], file=sys.stderr)
             time.sleep(5 * (i + 1))
+
+
+def save(path, db):
+    with open(path + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump(db, f, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    os.replace(path + '.tmp', path)
 
 
 def team_pdf(url):
@@ -63,6 +69,7 @@ def main():
     ap.add_argument('--limit', type=int, default=1500, help='max clinic×programme lookups per run')
     ap.add_argument('--max-age-days', type=int, default=30)
     ap.add_argument('--delay', type=float, default=0.4)
+    ap.add_argument('--workers', type=int, default=1)
     ap.add_argument('--areas', default='', help='comma list of NHI area codes, for testing')
     a = ap.parse_args()
 
@@ -96,22 +103,28 @@ def main():
     todo = [(code, p) for p in PLANS for code in members[p]
             if db.get(code, {}).get('fetched', {}).get(p, '') < cutoff]
     todo.sort(key=lambda t: db.get(t[0], {}).get('fetched', {}).get(t[1], ''))
-    done = 0
-    for code, p in todo[:a.limit]:
+    def lookup(item):
+        code, p = item
+        time.sleep(a.delay)
         try:
             r = call('/inae1000s00/SQL300_2', {'C_HospID': code, 'C_planType': p})
         except Exception as e:
             print('  skip', code, p, repr(e)[:120], file=sys.stderr)
-            continue
-        names = [d['prsn_name'].strip() for d in (r.get('hosp_dr') or []) if d.get('prsn_name')]
-        rec = db.setdefault(code, {'plans': {}, 'fetched': {}})
-        rec['plans'][p] = names
-        rec['fetched'][p] = today
-        done += 1
-        if done % 200 == 0:
-            print(f'  {done}/{min(len(todo), a.limit)}', file=sys.stderr)
-            json.dump(db, open(path, 'w', encoding='utf-8'), ensure_ascii=False, sort_keys=True)
-        time.sleep(a.delay)
+            return item, None
+        return item, [d['prsn_name'].strip() for d in (r.get('hosp_dr') or []) if d.get('prsn_name')]
+
+    done = 0
+    with cf.ThreadPoolExecutor(a.workers) as ex:
+        for (code, p), names in ex.map(lookup, todo[:a.limit]):
+            if names is None:
+                continue
+            rec = db.setdefault(code, {'plans': {}, 'fetched': {}})
+            rec['plans'][p] = names
+            rec['fetched'][p] = today
+            done += 1
+            if done % 200 == 0:
+                print(f'  {done}/{min(len(todo), a.limit)}', file=sys.stderr)
+                save(path, db)
 
     # 3. outreach team lists
     for url in TEAM_PDFS:
@@ -131,8 +144,7 @@ def main():
         print(f'team list: {len(rows)} dentists at {len(team)} clinics', file=sys.stderr)
 
     db = {k: v for k, v in db.items() if any(v.get('plans', {}).values())}
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(db, f, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    save(path, db)
     names = sum(len({n for l in v['plans'].values() for n in l}) for v in db.values())
     print(f'dentists: looked up {done}, remaining {max(0, len(todo) - done)}; {names} dentists at {len(db)} clinics', file=sys.stderr)
 

@@ -69,6 +69,13 @@ header.top{display:flex;align-items:center;gap:12px;padding-block:16px 6px;flex-
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .charts{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}
+.qgrid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px}
+.qstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.qstat{border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:left;background:none}
+button.qstat:hover{border-color:var(--accent)}
+.qstat .v{font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums}
+.qstat .k{font-size:12px;color:var(--muted)}
+.chk{font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--warn);color:var(--ink);white-space:nowrap}
 
 /* horizontal stacked bars, HTML-based so they reflow on phones */
 .bars{display:flex;flex-direction:column;gap:2px}
@@ -149,7 +156,7 @@ dl.kv dd{margin:0;overflow-wrap:anywhere}
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
 footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
 
-@media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} .charts{grid-template-columns:1fr} }
+@media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} .charts,.qgrid{grid-template-columns:1fr} }
 @media (max-width:640px){
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .btn .lbl{display:none}
@@ -200,6 +207,14 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
   </section>
 </div>
 
+<section class="card" aria-labelledby="qTitle">
+  <div class="head"><h2 id="qTitle">資料完整度與比對</h2><span class="sub" id="qSub"></span></div>
+  <div class="qgrid">
+    <div><div class="sub" style="margin-bottom:6px">營業中診所各欄位有資料的比例</div><div class="bars single" id="covBars" role="group" aria-label="欄位完整度"></div></div>
+    <div><div class="sub" style="margin-bottom:6px">各來源交叉比對結果</div><div class="qstats" id="qStats"></div></div>
+  </div>
+</section>
+
 <section class="card" aria-labelledby="searchTitle">
   <div class="head"><h2 id="searchTitle">搜尋診所</h2></div>
   <div class="filters">
@@ -212,7 +227,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
     </select>
     <select id="sortSel" aria-label="排序">
       <option value="city">依地區排序</option><option value="name">依名稱排序</option><option value="rating">Google 評分高→低</option>
-      <option value="reviews">評論數多→少</option><option value="dentists">牙醫師人數多→少</option><option value="since">特約最久</option><option value="newest">最新開業</option>
+      <option value="reviews">評論數多→少</option><option value="dentists">牙醫師人數多→少</option><option value="since">特約最久</option><option value="newest">最新開業</option><option value="complete">資料最完整</option>
     </select>
   </div>
   <div class="checks" role="group" aria-label="條件">
@@ -225,6 +240,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
     <label><input type="checkbox" data-f="sun">週日有看診</label>
     <label><input type="checkbox" data-f="multi">2 位以上牙醫師</label>
     <label><input type="checkbox" data-f="doctors">有醫師名單</label>
+    <label><input type="checkbox" data-f="checks">需查證（來源不一致）</label>
   </div>
   <div class="result-bar"><span id="count" aria-live="polite"></span><span class="sp"></span><button class="btn sm" id="reset" type="button">清除條件</button></div>
   <div class="table-wrap">
@@ -287,7 +303,7 @@ const ymd = s => s && s.length === 8 ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slic
 /* ---------- load ---------- */
 fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
   meta = d.meta; all = d.clinics;
-  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, (c.doctors || []).join(' '), c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
+  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, (c.doctors || []).join(' '), (c.aliases || []).join(' '), (c.programs || []).join(' '), c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
   init();
 }).catch(e => {
   $('#loading').innerHTML = '無法載入資料（' + esc(e.message) + '）。<br>請透過網站網址開啟本頁；若直接以檔案開啟，瀏覽器會擋下資料讀取，可在專案資料夾執行 <code>python3 -m http.server</code> 再開啟 http://localhost:8000/dental.html';
@@ -302,7 +318,7 @@ function init() {
   const s = meta.sources || {};
   $('#sources').innerHTML = '資料來源：' + Object.values(s).filter(x => x.used !== false).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join('、') +
     '。看診牙醫取自健保署院所查詢公開的計畫醫師名單（牙周病統合治療、身心障礙服務、牙齒外傷急症）與醫療團名單，未參加這些計畫的醫師不會列出。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
-  restore(); tiles(); charts(); apply();
+  restore(); tiles(); charts(); quality(); apply();
 }
 
 /* ---------- tiles ---------- */
@@ -315,11 +331,27 @@ function tiles() {
   $('#tOpen').textContent = fmt(open.length); $('#tOpenS').textContent = `另有 ${fmt(all.length - open.length)} 間已終止`;
   $('#tNhi').textContent = fmt(nhi.length); $('#tNhiS').textContent = pct(nhi.length);
   $('#tSelf').textContent = fmt(self.length); $('#tSelfS').textContent = pct(self.length);
-  const named = open.filter(c => c.doctors && c.doctors.length).length;
-  $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = (withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '') + (named ? ` · ${fmt(named)} 間有醫師名單` : '');
+  $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '';
   $('#tG').textContent = fmt(g.length);
   $('#tGS').textContent = g.length ? `平均 ${(g.reduce((s, c) => s + c.googleRating, 0) / g.length).toFixed(2)} ★` : '尚未設定 Google API';
   $('#tLine').textContent = fmt(line.length); $('#tLineS').textContent = line.length ? pct(line.length) : '需先取得診所網站';
+}
+
+/* ---------- data quality ---------- */
+function quality() {
+  const q = meta.quality; if (!q) { $('#qTitle').closest('section').hidden = true; return; }
+  const L = { phone: '電話', address: '地址', hours: '看診時段', dentists: '牙醫師人數', doctors: '醫師姓名', programs: '健保計畫', regFee: '掛號費',
+    website: '網站', line: 'LINE', email: 'Email', taxId: '統一編號', owner: '負責人', googleRating: 'Google 評分' };
+  const rows = Object.entries(q.fieldCoverage).map(([k, v]) => ({ key: L[k] || k, a: v })).sort((x, y) => y.a - x.a);
+  barRows($('#covBars'), rows, q.openClinics, true);
+  $('#covBars').querySelectorAll('.val').forEach((el, i) => el.textContent = Math.round(rows[i].a / q.openClinics * 100) + '%');
+  bindTips($('#covBars'), k => { const r = rows.find(x => x.key === k); return `<b>${esc(k)}</b><div class="r"><span>有資料</span><span class="mono">${fmt(r.a)} / ${fmt(q.openClinics)}</span></div>`; });
+  $('#qSub').textContent = `平均完整度 ${q.avgCompleteness}% · ${fmt(q.namedDentists)} 位具名牙醫分布在 ${fmt(q.clinicsWithDoctors)} 間診所`;
+  const st = [['電話不一致', q.phoneConflicts, '健保署與衛福部登記的市話不同'], ['名稱不一致', q.nameDiffs, '可能已改名'], ['地址不一致', q.addressDiffs, '可能已遷址'],
+    ['同址多家機構', q.sharedAddress, '同一門牌登記多個機構代碼'], ['舊址已由新機構接手', q.relocations, '已終止機構與現有機構同址'], ['在多間診所看診的醫師', q.dentistsAtSeveralClinics, '支援醫師或同名同姓']];
+  $('#qStats').innerHTML = st.map(([k, v, t]) => `<div class="qstat" title="${esc(t)}"><div class="v">${fmt(v)}</div><div class="k">${esc(k)}</div></div>`).join('')
+    + `<button type="button" class="qstat" id="qShow"><div class="v">${fmt(all.filter(c => c.checks).length)}</div><div class="k">顯示需查證的診所 →</div></button>`;
+  $('#qShow').onclick = () => { document.querySelector('.checks input[data-f=checks]').checked = true; page = 0; apply(); save(); $('#searchTitle').scrollIntoView({ behavior: 'smooth' }); };
 }
 
 /* ---------- charts ---------- */
@@ -426,6 +458,7 @@ function apply() {
     if (f.sun && !sunOpen(c)) return false;
     if (f.multi && !(c.dentists >= 2)) return false;
     if (f.doctors && !(c.doctors && c.doctors.length)) return false;
+    if (f.checks && !(c.checks && c.checks.length)) return false;
     if (terms.length && !terms.every(t => c._hay.includes(t)) && !(qd.length >= 4 && digits(c.phone).includes(qd))) return false;
     return true;
   });
@@ -438,6 +471,7 @@ function apply() {
     dentists: (a, b) => (b.dentists || 0) - (a.dentists || 0) || zh(a.name, b.name),
     since: (a, b) => (a.nhiSince || '99999999').localeCompare(b.nhiSince || '99999999'),
     newest: (a, b) => (b.nhiSince || '').localeCompare(a.nhiSince || ''),
+    complete: (a, b) => (b.completeness || 0) - (a.completeness || 0) || zh(a.name, b.name),
   }[s];
   view.sort(cmp);
   $('#count').textContent = `找到 ${fmt(view.length)} 間診所`;
@@ -460,7 +494,7 @@ function renderPage() {
     return `<tr data-code="${esc(c.code)}" tabindex="0">
       <td><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.city || '')}${esc(c.district || '')}${c.owner ? ' · 負責人 ' + esc(c.owner) : ''}</div>${c.doctors ? `<div class="sub">醫師：${esc(c.doctors.slice(0, 4).join('、'))}${c.doctors.length > 4 ? ` 等 ${c.doctors.length} 位` : ''}</div>` : ''}</td>
       <td><div>${esc((c.address || '').replace(c.city || '', '').replace(c.district || '', ''))}</div><div class="sub mono">${c.phone ? `<a href="tel:${digits(c.phone)}">${esc(c.phone)}</a>` : ''}</div></td>
-      <td><span class="badge ${badge}">${esc(c.status)}</span></td>
+      <td><span class="badge ${badge}">${esc(c.status)}</span>${c.checks ? `<div style="margin-top:4px"><span class="chk" title="${esc(c.checks.join('、'))}">需查證</span></div>` : ''}</td>
       <td class="num">${c.googleRating != null ? `<span class="star mono">${c.googleRating.toFixed(1)} ★</span><div class="sub mono">${fmt(c.googleReviews)} 則</div>` : '<span class="sub">—</span>'}</td>
       <td class="num mono c-dent">${c.dentists ?? '—'}</td>
       <td><div class="links">${links}</div></td>
@@ -517,7 +551,9 @@ function openDetail(c) {
   $('#dBody').innerHTML = `<dl class="kv">
     ${row('狀態', esc(c.status) + (c.nhiUntil ? `<span class="sub">（健保合約 ${ymd(c.nhiSince)} – ${ymd(c.nhiUntil)}）</span>` : ''))}
     ${row('地址', esc(c.address))}
-    ${row('電話', c.phone ? `<a href="tel:${digits(c.phone)}" class="mono">${esc(c.phone)}</a>` : '')}
+    ${row('電話', c.phone ? `<a href="tel:${digits(c.phone)}" class="mono">${esc(c.phone)}</a>` + (c.otherPhones ? `<div class="sub mono">其他：${esc(c.otherPhones.join('、'))}</div>` : '') : '')}
+    ${row('其他名稱', esc((c.aliases || []).join('、')))}
+    ${row('其他地址', esc((c.otherAddresses || []).join('；')))}
     ${row('負責人', esc(c.owner))}
     ${row('統一編號', c.taxId ? `<span class="mono">${esc(c.taxId)}</span>` : '')}
     ${row('機構代碼', `<span class="mono">${esc(c.code)}</span>`)}
@@ -531,8 +567,16 @@ function openDetail(c) {
     ${row('Facebook', c.facebook ? link(c.facebook) : '')}
     ${row('Instagram', c.instagram ? link(c.instagram) : '')}
     ${row('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
+    ${row('參與健保計畫', esc((c.programs || []).join('、')))}
+    ${row('掛號費', esc(c.regFee))}
+    ${row('預防保健', esc((c.preventive || []).join('、')))}
+    ${row('無障礙', esc(c.accessibility))}
     ${row('看診時段', hoursGrid(c.hours) + (c.hoursNote ? `<div class="sub" style="margin-top:4px">${esc(c.hoursNote)}</div>` : ''))}
     ${row('資料來源', esc((c.sources || []).join('、')))}
+    ${row('資料完整度', c.completeness != null ? `${c.completeness}%` + (c.doctorCoverage != null ? `<span class="sub">（醫師名單涵蓋登記人數 ${c.doctorCoverage}%）</span>` : '') : '')}
+    ${row('比對注意', c.checks ? c.checks.map(x => `<span class="chk">${esc(x)}</span>`).join(' ') + (c.replacedBy ? '' : '') : '')}
+    ${row('同址機構', c.sameAddressAs ? c.sameAddressAs.map(k => esc((all.find(x => x.code === k) || {}).name || k)).join('、') : '')}
+    ${row('遷址／改設', c.replacedBy ? '同址現有：' + esc((all.find(x => x.code === c.replacedBy) || {}).name || c.replacedBy) : '')}
   </dl>
   <p class="note">缺少的欄位（網站、LINE、統編、負責人）可到 GitHub 編輯 <code>data/dental-extra.csv</code> 補上，下次更新會自動合併。</p>`;
   $('#dMap').href = mapUrl(c);
