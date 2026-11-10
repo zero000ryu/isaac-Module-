@@ -39,7 +39,7 @@ jobs:
       - name: Google rating and website (only if GOOGLE_MAPS_API_KEY secret is set)
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          GOOGLE_LIMIT: ${{ vars.GOOGLE_LIMIT || '300' }}
+          GOOGLE_LIMIT: ${{ vars.GOOGLE_LIMIT || '30' }}   # ~900/month stays inside Places API free monthly usage
         run: python scripts/enrich_google.py
       - name: LINE, Facebook, 統編, 負責人 from clinic websites
         run: python scripts/enrich_web.py --limit 400

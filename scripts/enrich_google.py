@@ -51,7 +51,7 @@ def pick(clinic, places):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--limit', type=int, default=int(os.environ.get('GOOGLE_LIMIT', 300)))
+    ap.add_argument('--limit', type=int, default=int(os.environ.get('GOOGLE_LIMIT', 30)))
     ap.add_argument('--max-age-days', type=int, default=30)
     a = ap.parse_args()
     key = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()

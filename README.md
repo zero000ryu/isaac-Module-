@@ -63,7 +63,7 @@
 | LINE、Facebook、Email、負責人、統編 | 診所官網公開資訊（`scripts/enrich_web.py`，遵守 robots.txt） | 有網站的診所才有 |
 | 任何欄位的人工修正 | `data/dental-extra.csv`（以醫事機構代碼對應，優先採用） | — |
 
-**啟用 Google 評分**：到 Google Cloud 啟用「Places API (New)」並建立 API 金鑰，再到 GitHub repo 的 Settings → Secrets and variables → Actions 新增 `GOOGLE_MAPS_API_KEY`。每天預設查 300 間（可用 repo 變數 `GOOGLE_LIMIT` 調整），約 26 天輪完一次。Places API 會依用量計費，請先在 Google Cloud 設好預算上限；Google 的條款限制評分等內容的長期快取，使用前請自行確認。
+**啟用 Google 評分**：到 Google Cloud 啟用「Places API (New)」並建立 API 金鑰，再到 GitHub repo 的 Settings → Secrets and variables → Actions 新增 `GOOGLE_MAPS_API_KEY`。每天預設查 30 間（約每月 900 次，在 Google 每月免費額度內），可用 repo 變數 `GOOGLE_LIMIT` 調高以加快輪完全部診所。Places API 會依用量計費，請先在 Google Cloud 設好預算上限；Google 的條款限制評分等內容的長期快取，使用前請自行確認。
 
 **ERP 串接**：頁面右上「ERP 串接」提供固定網址 `data/dental.csv`（UTF-8、中文欄名）與 `data/dental.json`，可在 erp.top-geng.com 設定排程匯入，以「醫事機構代碼」作為唯一鍵。
 
