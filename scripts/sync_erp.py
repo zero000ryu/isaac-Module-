@@ -40,7 +40,13 @@ class ERP:
 
 
 def note_for(c):
-    parts = [f"醫事機構代碼 {c['code']}", c['status']]
+    parts = [f"醫事機構代碼 {c['code']}", c.get('category') or c['status']]
+    if c.get('hospitalLevel'):
+        parts.append(c['hospitalLevel'])
+    if c.get('zip'):
+        parts.append('郵遞區號 ' + c['zip'] + (('，' + c['village']) if c.get('village') else ''))
+    if c.get('owner'):
+        parts.append('院長 ' + c['owner'])
     if c.get('dentists'):
         parts.append(f"牙醫師 {c['dentists']} 位")
     if c.get('doctors'):

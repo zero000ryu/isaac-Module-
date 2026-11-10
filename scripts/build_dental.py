@@ -22,6 +22,12 @@ DATA = os.path.join(ROOT, 'data')
 NHI_URL = 'https://info.nhi.gov.tw/api/iode0000s01/Dataset?rId=A21030000I-D21004-009'
 MOHW_META = 'https://data.gov.tw/api/v2/rest/dataset/15393'
 TAX_URL = 'https://eip.fia.gov.tw/data/BGMOPEN1.csv'
+HOSP_URLS = {  # 健保特約醫事機構-醫學中心 / 區域醫院 / 地區醫院 (data.gov.tw 39280-39282)
+    '醫學中心': 'https://info.nhi.gov.tw/api/iode0000s01/Dataset?rId=A21030000I-D21001-003',
+    '區域醫院': 'https://info.nhi.gov.tw/api/iode0000s01/Dataset?rId=A21030000I-D21002-005',
+    '地區醫院': 'https://info.nhi.gov.tw/api/iode0000s01/Dataset?rId=A21030000I-D21003-003',
+}
+DENTAL_DEPT = re.compile(r'牙|口腔|齒')
 
 CITIES = ['臺北市','新北市','基隆市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣',
           '臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣']
@@ -217,15 +223,23 @@ def main():
         nhi = load_nhi(fetch(NHI_URL, os.path.join(a.cache_dir, 'nhi_clinics.csv'), a.cache))
         mohw_url, mohw_date = mohw_download_url(a.cache_dir, a.cache)
         mohw = load_mohw(fetch(mohw_url, os.path.join(a.cache_dir, 'mohw_staff.ods'), a.cache))
+        hosp = {}
+        for level, url in HOSP_URLS.items():
+            with open(fetch(url, os.path.join(a.cache_dir, f'nhi_hosp_{level}.csv'), a.cache), encoding='utf-8-sig', newline='') as f:
+                for r in csv.DictReader(f):
+                    if DENTAL_DEPT.search(r.get('診療科別', '')):
+                        hosp[r['醫事機構代碼'].strip()] = {**r, '_level': level}
     except SourceUnavailable as e:
         if os.path.exists(os.path.join(DATA, 'dental.json')):
             print(f'::warning::source unavailable, keeping previous data: {e}', file=sys.stderr)
             return
         raise
-    print(f'NHI dental: {len(nhi)}  MOHW dental: {len(mohw)}', file=sys.stderr)
+    print(f'NHI dental: {len(nhi)}  MOHW dental: {len(mohw)}  hospitals with dental dept: {len(hosp)}', file=sys.stderr)
+    nhi = {**nhi, **hosp}  # hospitals share the NHI file layout
 
     google, web, extra, dentists = load_json('google.json'), load_json('web.json'), load_extra(), load_json('dentists.json')
-    detail = load_json('nhi_detail.json')
+    detail, tda = load_json('nhi_detail.json'), load_json('tda.json')
+    geo = load_geo()
     prev = {c['code']: c for c in load_json('dental.json').get('clinics', [])} if os.path.exists(os.path.join(DATA, 'dental.json')) else {}
 
     clinics = []
@@ -257,6 +271,14 @@ def main():
             'dentists': (m or {}).get('dentists'), 'staff': {k: m[k] for k in ('nurses', 'techs')} if m else None,
             'sources': [s for s, ok in (('健保署', n), ('衛福部', m)) if ok],
         }
+        if code in hosp:
+            c['type'] = '醫院'
+            c['hospitalLevel'] = hosp[code]['_level']
+            c['specs'] = [x for x in c['specs'] if DENTAL_DEPT.search(x)]
+            c['hours'] = ''  # hospital-wide hours say nothing about the dental clinic
+        else:
+            c['type'] = '診所'
+        c['category'] = '醫院牙科' if c['type'] == '醫院' else {'健保特約': '健保特約診所', '自費': '自費診所'}.get(status, '已歇業／終止')
         # carry forward fields that only later steps fill, so a run without --tax keeps last known 統編
         if code in prev and prev[code].get('taxId'):
             c['taxId'] = prev[code]['taxId']
@@ -303,7 +325,7 @@ def main():
                 matched += 1
         print(f'tax registry matches: {matched}', file=sys.stderr)
 
-    quality = reconcile(clinics, nhi, mohw, detail)
+    quality = reconcile(clinics, nhi, mohw, detail, tda, geo)
 
     # drop empty values to keep the file small
     for c in clinics:
@@ -312,8 +334,8 @@ def main():
 
     by_city = {}
     for c in clinics:
-        s = by_city.setdefault(c.get('city') or '未知', {'健保特約': 0, '自費': 0, '已終止': 0})
-        s[c['status']] += 1
+        s = by_city.setdefault(c.get('city') or '未知', {'健保特約': 0, '自費': 0, '已終止': 0, '醫院': 0})
+        s['醫院' if c['type'] == '醫院' else c['status']] += 1
     meta = {
         'generatedAt': dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).isoformat(timespec='seconds'),
         'sources': {
@@ -323,6 +345,9 @@ def main():
         },
         'total': len(clinics), 'byCity': by_city, 'quality': quality['summary'],
     }
+    meta['sources']['hospitals'] = {'name': '健保署 健保特約醫院（醫學中心、區域、地區）設牙科者', 'url': 'https://data.gov.tw/dataset/39280', 'records': len(hosp)}
+    meta['sources']['tda'] = {'name': '臺北市牙醫師公會 診所查詢（負責醫師）', 'url': 'https://www.tda.org.tw/people/hospital/', 'records': len(tda)}
+    meta['sources']['post'] = {'name': '中華郵政 郵遞區號前3碼、村里名稱', 'url': 'https://www.post.gov.tw/post/internet/Download/index.jsp?ID=220306'}
     meta['sources']['nhiDetail'] = {'name': '健保署 院所查詢（計畫、掛號費、無障礙、預防保健）', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1000S01', 'records': len(detail)}
     meta['sources']['nhiDoctors'] = {'name': '健保署 牙醫計畫院所查詢醫師名單與醫療團名單', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1020S01', 'records': len(dentists)}
     os.makedirs(DATA, exist_ok=True)
@@ -410,11 +435,82 @@ def zh_to_num(t):
 ZH_NUM = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
 
 
-COMPLETENESS_FIELDS = ['phone', 'address', 'hours', 'dentists', 'doctors', 'programs', 'regFee',
+COMPLETENESS_FIELDS = ['phone', 'address', 'zip', 'hours', 'dentists', 'doctors', 'programs', 'regFee',
                        'website', 'line', 'email', 'taxId', 'owner', 'googleRating']
 
 
-def reconcile(clinics, nhi, mohw, detail):
+def load_geo():
+    z = load_json('zip3.json').get('zip3', {})
+    v = set(load_json('villages.json').get('villages', []))
+    return {'zip3': z, 'villages': v}
+
+
+def fill_geo(c, addresses, geo):
+    city, dist = c.get('city', ''), c.get('district', '')
+    if city:
+        c['cityType'] = '直轄市' if city in ('臺北市', '新北市', '桃園市', '臺中市', '臺南市', '高雄市') else ('市' if city.endswith('市') else '縣')
+    if dist:
+        c['districtType'] = {'區': '區', '鄉': '鄉', '鎮': '鎮', '市': '市'}.get(dist[-1], '')
+    table = geo['zip3'].get(city, {})
+    z = table.get(dist) or table.get(dist[:-1]) or table.get(re.sub(r'[鄉鎮市區]$', '', dist))
+    if not z and table:
+        # the district was cut short (e.g. 平鎮區 read as 平鎮): find the official name in the address
+        rest = norm_text(c.get('address', '')).replace('台', '臺').split(city, 1)[-1]
+        for k in sorted(table, key=len, reverse=True):
+            m = re.match(re.escape(k) + r'([鄉鎮市區]?)', rest)
+            if k != '*' and m:
+                c['district'] = k if k[-1] in '鄉鎮市區' and not m.group(1) else k + m.group(1)
+                dist, z = c['district'], table[k]
+                c['districtType'] = dist[-1] if dist[-1] in '鄉鎮市區' else ''
+                break
+    z = z or table.get('*')
+    if z:
+        c['zip'] = z
+    # village (村/里) appears in some registrations of the address; keep it only if it is a real village name
+    for a in addresses:
+        a = norm_text(a).replace('台', '臺')
+        rest = a.split(dist, 1)[1] if dist and dist in a else a
+        m = re.match(r'([\u4e00-\u9fff]{1,4}?[里村])(?=[\u4e00-\u9fff\d])', rest)
+        if m and m.group(1) in geo['villages']:
+            c['village'] = m.group(1)
+            c['villageType'] = m.group(1)[-1]
+            break
+
+
+def match_tda(clinics, tda):
+    """Attach the Taipei Dental Association entry to its clinic and resolve the masked 負責醫師."""
+    taipei = [c for c in clinics if c.get('city') == '臺北市' and c['status'] != '已終止']
+    by_name = {}
+    for c in taipei:
+        by_name.setdefault(norm_name(c['name']), []).append(c)
+    matched = resolved = 0
+    for e in tda.values():
+        cand = [c for c in taipei if e.get('phone') and same_phone(e['phone'], c.get('phone', ''))]
+        if len(cand) != 1:
+            cand = by_name.get(norm_name(e['name'] + '診所'), []) or by_name.get(norm_name(e['name']), [])
+        if len(cand) != 1:
+            continue
+        c = cand[0]
+        matched += 1
+        c.setdefault('sources', []).append('臺北市牙醫師公會')
+        if e.get('fax'):
+            c['fax'] = e['fax']
+        if e.get('website') and not c.get('website') and e['website'].startswith('http') and 'line.me' not in e['website']:
+            c['website'] = e['website']
+        mask = e.get('ownerMasked', '')
+        if not mask:
+            continue
+        c['ownerMasked'] = mask
+        rx = re.compile('^' + re.sub(r'[OＯ○〇0*＊]', '.', re.escape(mask).replace('\\', '')) + '$')
+        hits = [d for d in c.get('doctors', []) if rx.match(d)]
+        if len(hits) == 1 and not c.get('owner'):
+            c['owner'] = hits[0]
+            c['ownerSource'] = '臺北市牙醫師公會負責醫師（比對健保醫師名單）'
+            resolved += 1
+    return {'matched': matched, 'resolved': resolved}
+
+
+def reconcile(clinics, nhi, mohw, detail, tda, geo):
     """Cross-check every source against the others and fold the results into one record per clinic."""
     issues = []
     by_code = {c['code']: c for c in clinics}
@@ -465,6 +561,14 @@ def reconcile(clinics, nhi, mohw, detail):
         if checks:
             c['checks'] = checks
 
+    # postcode, county/district type and village for every record
+    for c in clinics:
+        variants = [c.get('address')] + c.get('otherAddresses', []) + [(mohw.get(c['code']) or {}).get('addr'), (detail.get(c['code']) or {}).get('address')]
+        fill_geo(c, [v for v in variants if v], geo)
+
+    # Taipei Dental Association: responsible dentist (院長), fax, website
+    owners = match_tda(clinics, tda)
+
     # same building, different institution code: relocation / re-registration, or shared premises
     by_addr = {}
     for c in clinics:
@@ -491,6 +595,13 @@ def reconcile(clinics, nhi, mohw, detail):
             seen.setdefault(name, []).append(c['code'])
     multi = {k: v for k, v in seen.items() if len(v) > 1}
 
+    # roles: the responsible dentist of a clinic is its 院長
+    for c in clinics:
+        if c.get('owner') and c['type'] == '診所':
+            c['roles'] = {c['owner']: '院長', **{k: v for k, v in c.get('roles', {}).items() if k != c['owner']}}
+            if c['owner'] not in c.get('doctors', []):
+                c['doctors'] = [c['owner']] + c.get('doctors', [])
+
     # completeness score
     open_ = [c for c in clinics if c['status'] != '已終止']
     for c in clinics:
@@ -505,6 +616,9 @@ def reconcile(clinics, nhi, mohw, detail):
         'namedDentists': len(seen), 'dentistsAtSeveralClinics': len(multi),
         'clinicsWithDoctors': sum(1 for c in open_ if c.get('doctors')),
         'avgCompleteness': round(sum(c['completeness'] for c in open_) / max(1, len(open_))),
+        'withZip': sum(1 for c in open_ if c.get('zip')), 'withVillage': sum(1 for c in open_ if c.get('village')),
+        'tdaMatched': owners['matched'], 'ownersResolved': owners['resolved'],
+        'byCategory': {k: sum(1 for c in clinics if c.get('category') == k) for k in ('健保特約診所', '自費診所', '醫院牙科', '已歇業／終止')},
     }
     return {'summary': summary, 'issues': issues[:3000],
             'dentistsAtSeveralClinics': dict(sorted(multi.items(), key=lambda kv: -len(kv[1]))[:500])}
@@ -517,7 +631,9 @@ CSV_COLS = [('code', '醫事機構代碼'), ('name', '診所名稱'), ('status',
             ('googleReviews', 'Google評論數'), ('dentists', '牙醫師人數'), ('doctors', '看診牙醫'), ('kind', '機構類別'), ('specs', '診療科別'),
             ('nhiSince', '健保合約起日'), ('nhiUntil', '健保合約迄日'), ('hours', '看診時段碼'), ('hoursNote', '看診備註'),
             ('otherPhones', '其他電話'), ('programs', '參與健保計畫'), ('regFee', '掛號費'), ('accessibility', '無障礙'),
-            ('preventive', '預防保健服務'), ('completeness', '資料完整度'), ('checks', '比對注意事項')]
+            ('preventive', '預防保健服務'), ('completeness', '資料完整度'), ('checks', '比對注意事項'),
+            ('category', '機構類型'), ('hospitalLevel', '醫院層級'), ('zip', '郵遞區號'), ('cityType', '縣市類型'),
+            ('districtType', '鄉鎮市區類型'), ('village', '村里'), ('fax', '傳真'), ('ownerMasked', '公會登記負責醫師')]
 LIST_COLS = {'specs', 'doctors', 'otherPhones', 'programs', 'preventive', 'checks'}
 
 
