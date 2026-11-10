@@ -288,6 +288,8 @@ def main():
             if g.get('website'):
                 c['website'] = g['website']
             c['googleFetched'] = g.get('fetched', '')
+            if g.get('hours'):
+                c['googleHours'] = g['hours']
         dr = dentists.get(code)
         if dr:
             # names from every NHI programme list, in first-seen order
@@ -465,6 +467,53 @@ def specialties(c):
     return list(dict.fromkeys(out))
 
 
+# a session counts as open if the clinic is open for at least 60 minutes inside it
+SESSIONS = (('上午', 0, 1200), ('下午', 1200, 1800), ('晚上', 1800, 2400))
+
+
+def to_min(hhmm):
+    return int(hhmm[:2]) * 60 + int(hhmm[2:])
+
+
+def google_bits(periods):
+    bits = ['0'] * 21
+    for day, start, end in periods:
+        s, e = to_min(start), to_min(end) if end != '0000' else 24 * 60
+        for p, (_, a, b) in enumerate(SESSIONS):
+            if min(e, to_min(f'{b:04d}') if b < 2400 else 1440) - max(s, to_min(f'{a:04d}')) >= 60:
+                bits[day * 3 + p] = '1'
+    return ''.join(bits)
+
+
+def compare_hours(c):
+    """Compare NHI hours (sessions, exact times where registered) with Google Maps. None if either is missing."""
+    g = (c.get('googleHours') or {}).get('periods')
+    nhi = c.get('hours', '')
+    if not g or len(nhi) != 21:
+        return None
+    gb = google_bits(g)
+    diffs = []
+    for d in range(7):
+        for p, (name, _, _) in enumerate(SESSIONS):
+            i = d * 3 + p
+            if nhi[i] != gb[i]:
+                diffs.append(f"週{'一二三四五六日'[d]}{name}：健保署{'看診' if nhi[i] == '1' else '休診'}、Google{'營業' if gb[i] == '1' else '休息'}")
+    # exact times: compare start/end of each NHI session with the Google period covering it (>30 min apart)
+    times = c.get('hoursTimes')
+    if times:
+        for p, row in enumerate(times):
+            for d, t in enumerate(row):
+                if not re.fullmatch(r'\d{4}-\d{4}', t or ''):
+                    continue
+                s, e = to_min(t[:4]), to_min(t[5:])
+                over = [x for x in g if x[0] == d and to_min(x[1]) < e and to_min(x[2]) > s]
+                if over:
+                    gs, ge = min(to_min(x[1]) for x in over), max(to_min(x[2]) for x in over)
+                    if abs(gs - s) > 30 and p == 0 or abs(ge - e) > 30 and p == 2:
+                        diffs.append(f"週{'一二三四五六日'[d]}{SESSIONS[p][0]}時間：健保署 {t[:2]}:{t[2:4]}-{t[5:7]}:{t[7:]}、Google {gs // 60:02d}:{gs % 60:02d}-{ge // 60:02d}:{ge % 60:02d}")
+    return {'google': gb, 'diffs': diffs}
+
+
 def load_geo():
     z = load_json('zip3.json').get('zip3', {})
     v = set(load_json('villages.json').get('villages', []))
@@ -637,6 +686,19 @@ def reconcile(clinics, nhi, mohw, detail, tda, geo):
             if h.get('updated'):
                 c['hoursUpdated'] = h['updated']
 
+    # NHI hours vs Google Maps opening hours
+    compared = differ = 0
+    for c in clinics:
+        res = compare_hours(c)
+        if res is None:
+            continue
+        compared += 1
+        c['hoursCheck'] = res
+        if res['diffs']:
+            differ += 1
+            c.setdefault('checks', []).append('看診時段與 Google 不一致')
+            issues.append({'code': c['code'], 'name': c['name'], 'type': '看診時段與 Google 不一致', 'values': res['diffs'][:6]})
+
     # specialty / service labels for filtering
     for c in clinics:
         c['specialties'] = specialties(c)
@@ -668,6 +730,7 @@ def reconcile(clinics, nhi, mohw, detail, tda, geo):
         'namedDentists': len(seen), 'dentistsAtSeveralClinics': len(multi),
         'clinicsWithDoctors': sum(1 for c in open_ if c.get('doctors')),
         'avgCompleteness': round(sum(c['completeness'] for c in open_) / max(1, len(open_))),
+        'hoursCompared': compared, 'hoursDiffer': differ,
         'withZip': sum(1 for c in open_ if c.get('zip')), 'withVillage': sum(1 for c in open_ if c.get('village')),
         'tdaMatched': owners['matched'], 'ownersResolved': owners['resolved'],
         'byCategory': {k: sum(1 for c in clinics if c.get('category') == k) for k in ('健保特約診所', '自費診所', '醫院牙科', '已歇業／終止')},

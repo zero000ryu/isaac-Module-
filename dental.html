@@ -358,7 +358,7 @@ function quality() {
   bindTips($('#covBars'), k => { const r = rows.find(x => x.key === k); return `<b>${esc(k)}</b><div class="r"><span>有資料</span><span class="mono">${fmt(r.a)} / ${fmt(q.openClinics)}</span></div>`; });
   $('#qSub').textContent = `平均完整度 ${q.avgCompleteness}% · ${fmt(q.namedDentists)} 位具名牙醫分布在 ${fmt(q.clinicsWithDoctors)} 間診所`;
   const st = [['電話不一致', q.phoneConflicts, '健保署與衛福部登記的市話不同'], ['名稱不一致', q.nameDiffs, '可能已改名'], ['地址不一致', q.addressDiffs, '可能已遷址'],
-    ['同址多家機構', q.sharedAddress, '同一門牌登記多個機構代碼'], ['舊址已由新機構接手', q.relocations, '已終止機構與現有機構同址'], ['在多間診所看診的醫師', q.dentistsAtSeveralClinics, '支援醫師或同名同姓']];
+    ['看診時段與 Google 不一致', q.hoursDiffer || 0, `已比對 ${fmt(q.hoursCompared || 0)} 間（需 Google API 金鑰）`], ['同址多家機構', q.sharedAddress, '同一門牌登記多個機構代碼'], ['舊址已由新機構接手', q.relocations, '已終止機構與現有機構同址'], ['在多間診所看診的醫師', q.dentistsAtSeveralClinics, '支援醫師或同名同姓']];
   $('#qStats').innerHTML = st.map(([k, v, t]) => `<div class="qstat" title="${esc(t)}"><div class="v">${fmt(v)}</div><div class="k">${esc(k)}</div></div>`).join('')
     + `<button type="button" class="qstat" id="qShow"><div class="v">${fmt(all.filter(c => c.checks).length)}</div><div class="k">顯示需查證的診所 →</div></button>`;
   $('#qShow').onclick = () => { document.querySelector('.checks input[data-f=checks]').checked = true; page = 0; apply(); save(); $('#searchTitle').scrollIntoView({ behavior: 'smooth' }); };
@@ -591,6 +591,8 @@ function openDetail(c) {
     ${row('預防保健', esc((c.preventive || []).join('、')))}
     ${row('無障礙', esc(c.accessibility))}
     ${row('看診時段', hoursGrid(c.hours, c.hoursTimes) + (c.hoursNote ? `<div class="sub" style="margin-top:4px">${esc(c.hoursNote)}</div>` : '') + (c.hoursUpdated ? `<div class="sub">健保署資料更新：${esc(c.hoursUpdated)}（民國）</div>` : ''))}
+    ${row('Google 營業時間', c.googleHours ? hoursGrid(c.hoursCheck ? c.hoursCheck.google : '', null) + (c.googleHours.text || []).map(t => `<div class="sub">${esc(t)}</div>`).join('') : '<span class="sub">尚未取得（需設定 Google API 金鑰）</span>')}
+    ${row('時段比對', c.hoursCheck ? (c.hoursCheck.diffs.length ? c.hoursCheck.diffs.map(d => `<div><span class="chk">不一致</span> ${esc(d)}</div>`).join('') : '健保署與 Google 一致') : '')}
     ${row('專科與服務', esc((c.specialties || []).join('、')))}
     ${row('醫師介紹', c.doctorPage ? `<a href="${esc(c.doctorPage)}" target="_blank" rel="noopener">${c.doctorPage.includes('google.com/search') ? '搜尋此醫院的牙科醫師介紹' : '醫院網站：牙科醫師介紹'}</a><div class="sub">職稱、專長、學經歷與照片請見醫院網站</div>` : '')}
     ${row('資料來源', esc((c.sources || []).join('、')))}
