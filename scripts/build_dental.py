@@ -14,7 +14,7 @@ Then merges, keyed by 醫事機構代碼:
 
 Standard library only, so it runs anywhere (GitHub Actions, a laptop).
 """
-import argparse, csv, datetime as dt, io, json, os, re, sys, urllib.request, zipfile
+import argparse, csv, datetime as dt, io, json, os, re, sys, time, urllib.request, zipfile
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,18 +29,31 @@ FW = str.maketrans('０１２３４５６７８９－（）', '0123456789-()')
 EXTRA_COLS = ['code','taxId','owner','website','line','facebook','email','googleRating','googleReviews','googlePlaceId','note']
 
 
-def fetch(url, path, cache):
+def fetch(url, path, cache, tries=4):
     if cache and os.path.exists(path):
         return path
-    print('download', url, file=sys.stderr)
-    req = urllib.request.Request(url, headers={'User-Agent': 'dental-roster-builder/1.0'})
-    with urllib.request.urlopen(req, timeout=600) as r, open(path, 'wb') as f:
-        while True:
-            b = r.read(1 << 20)
-            if not b:
-                break
-            f.write(b)
-    return path
+    last = None
+    for i in range(tries):
+        print('download', url, f'(try {i + 1})', file=sys.stderr)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; dental-roster-builder/1.0)'})
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r, open(path + '.part', 'wb') as f:
+                while True:
+                    b = r.read(1 << 20)
+                    if not b:
+                        break
+                    f.write(b)
+            os.replace(path + '.part', path)
+            return path
+        except Exception as e:  # government hosts sometimes drop connections from overseas data centres
+            last = e
+            print('  failed:', repr(e)[:200], file=sys.stderr)
+            time.sleep(10 * (i + 1))
+    raise SourceUnavailable(f'{url}: {last!r}')
+
+
+class SourceUnavailable(Exception):
+    pass
 
 
 def norm_text(s):
@@ -197,9 +210,15 @@ def main():
     today = dt.date.today()
     tstr = today.strftime('%Y%m%d')
 
-    nhi = load_nhi(fetch(NHI_URL, os.path.join(a.cache_dir, 'nhi_clinics.csv'), a.cache))
-    mohw_url, mohw_date = mohw_download_url(a.cache_dir, a.cache)
-    mohw = load_mohw(fetch(mohw_url, os.path.join(a.cache_dir, 'mohw_staff.ods'), a.cache))
+    try:
+        nhi = load_nhi(fetch(NHI_URL, os.path.join(a.cache_dir, 'nhi_clinics.csv'), a.cache))
+        mohw_url, mohw_date = mohw_download_url(a.cache_dir, a.cache)
+        mohw = load_mohw(fetch(mohw_url, os.path.join(a.cache_dir, 'mohw_staff.ods'), a.cache))
+    except SourceUnavailable as e:
+        if os.path.exists(os.path.join(DATA, 'dental.json')):
+            print(f'::warning::source unavailable, keeping previous data: {e}', file=sys.stderr)
+            return
+        raise
     print(f'NHI dental: {len(nhi)}  MOHW dental: {len(mohw)}', file=sys.stderr)
 
     google, web, extra = load_json('google.json'), load_json('web.json'), load_extra()
@@ -256,7 +275,11 @@ def main():
 
     if a.tax:
         want = {norm_name(c['name']): c for c in clinics}
-        hits = load_tax(fetch(TAX_URL, os.path.join(a.cache_dir, 'tax.csv'), a.cache), set(want))
+        try:
+            hits = load_tax(fetch(TAX_URL, os.path.join(a.cache_dir, 'tax.csv'), a.cache), set(want))
+        except SourceUnavailable as e:
+            print(f'::warning::tax registry unavailable, keeping previous 統編: {e}', file=sys.stderr)
+            hits = {}
         matched = 0
         for nn, lst in hits.items():
             c = want[nn]
