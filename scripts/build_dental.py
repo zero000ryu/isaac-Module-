@@ -353,6 +353,7 @@ def main():
     meta['sources']['nhiDetail'] = {'name': '健保署 院所查詢（計畫、掛號費、無障礙、預防保健）', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1000S01', 'records': len(detail)}
     meta['sources']['nhiDoctors'] = {'name': '健保署 牙醫計畫院所查詢醫師名單與醫療團名單', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1020S01', 'records': len(dentists)}
     os.makedirs(DATA, exist_ok=True)
+    clinics = scrub(clinics)
     with open(os.path.join(DATA, 'dental.json'), 'w', encoding='utf-8') as f:
         json.dump({'meta': meta, 'clinics': clinics}, f, ensure_ascii=False, separators=(',', ':'))
     write_csv(clinics)
@@ -512,6 +513,17 @@ def compare_hours(c):
                     if abs(gs - s) > 30 and p == 0 or abs(ge - e) > 30 and p == 2:
                         diffs.append(f"週{'一二三四五六日'[d]}{SESSIONS[p][0]}時間：健保署 {t[:2]}:{t[2:4]}-{t[5:7]}:{t[7:]}、Google {gs // 60:02d}:{gs % 60:02d}-{ge // 60:02d}:{ge % 60:02d}")
     return {'google': gb, 'diffs': diffs}
+
+
+def scrub(v):
+    """Rare characters that NHI itself cannot display arrive as U+FFFD; show them as ○ (unreadable)."""
+    if isinstance(v, str):
+        return v.replace('\ufffd', '○')
+    if isinstance(v, list):
+        return [scrub(x) for x in v]
+    if isinstance(v, dict):
+        return {k: scrub(x) for k, x in v.items()}
+    return v
 
 
 def load_geo():
