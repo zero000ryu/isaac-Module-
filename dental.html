@@ -582,6 +582,7 @@ function openDetail(c) {
     ${row('人員', c.dentists != null ? `牙醫師 ${c.dentists} 位` + (c.staff ? `、護理 ${c.staff.nurses} 位、牙技 ${c.staff.techs} 位` : '') : '')}
     ${row('Google', c.googleRating != null ? `${c.googleRating.toFixed(1)} ★（${fmt(c.googleReviews)} 則評論）<span class="sub"> · ${esc(c.googleFetched || '')}</span>` : '')}
     ${row('網站', c.website ? link(c.website) : '')}
+    ${row('醫師門診表', c.schedulePage ? link(c.schedulePage, '診所網站：醫師門診時間表') + '<div class="sub">各醫師看診時間請見診所網站</div>' : '')}
     ${row('LINE', c.line ? link(lineUrl(c.line), c.line) : '')}
     ${row('Facebook', c.facebook ? link(c.facebook) : '')}
     ${row('Instagram', c.instagram ? link(c.instagram) : '')}

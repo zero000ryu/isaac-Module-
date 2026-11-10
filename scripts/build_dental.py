@@ -299,7 +299,7 @@ def main():
                 c['doctorPrograms'] = {p: v for p, v in dr['plans'].items() if v}
         w = web.get(code)
         if w:
-            for k in ('line', 'facebook', 'instagram', 'email', 'owner', 'taxId'):
+            for k in ('line', 'facebook', 'instagram', 'email', 'owner', 'taxId', 'schedulePage'):
                 if w.get(k) and not c.get(k):
                     c[k] = w[k]
         for k, v in extra.get(code, {}).items():
