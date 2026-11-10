@@ -221,7 +221,7 @@ def main():
         raise
     print(f'NHI dental: {len(nhi)}  MOHW dental: {len(mohw)}', file=sys.stderr)
 
-    google, web, extra = load_json('google.json'), load_json('web.json'), load_extra()
+    google, web, extra, dentists = load_json('google.json'), load_json('web.json'), load_extra(), load_json('dentists.json')
     prev = {c['code']: c for c in load_json('dental.json').get('clinics', [])} if os.path.exists(os.path.join(DATA, 'dental.json')) else {}
 
     clinics = []
@@ -262,6 +262,13 @@ def main():
             if g.get('website'):
                 c['website'] = g['website']
             c['googleFetched'] = g.get('fetched', '')
+        dr = dentists.get(code)
+        if dr:
+            # names from every NHI programme list, in first-seen order
+            names = list(dict.fromkeys(n for p in ('BD', 'C6', 'CT', 'team') for n in dr.get('plans', {}).get(p, [])))
+            if names:
+                c['doctors'] = names
+                c['doctorPrograms'] = {p: v for p, v in dr['plans'].items() if v}
         w = web.get(code)
         if w:
             for k in ('line', 'facebook', 'instagram', 'email', 'owner', 'taxId'):
@@ -321,7 +328,7 @@ def main():
 CSV_COLS = [('code', '醫事機構代碼'), ('name', '診所名稱'), ('status', '狀態'), ('city', '縣市'), ('district', '鄉鎮市區'),
             ('address', '地址'), ('phone', '電話'), ('taxId', '統一編號'), ('owner', '負責人'), ('website', '網站'),
             ('line', 'LINE'), ('facebook', 'Facebook'), ('email', 'Email'), ('googleRating', 'Google評分'),
-            ('googleReviews', 'Google評論數'), ('dentists', '牙醫師人數'), ('kind', '機構類別'), ('specs', '診療科別'),
+            ('googleReviews', 'Google評論數'), ('dentists', '牙醫師人數'), ('doctors', '看診牙醫'), ('kind', '機構類別'), ('specs', '診療科別'),
             ('nhiSince', '健保合約起日'), ('nhiUntil', '健保合約迄日'), ('hours', '看診時段碼'), ('hoursNote', '看診備註')]
 
 
@@ -330,7 +337,7 @@ def write_csv(clinics):
         w = csv.writer(f)
         w.writerow([zh for _, zh in CSV_COLS])
         for c in clinics:
-            w.writerow(['、'.join(c.get(k, [])) if k == 'specs' else c.get(k, '') for k, _ in CSV_COLS])
+            w.writerow(['、'.join(c.get(k, [])) if k in ('specs', 'doctors') else c.get(k, '') for k, _ in CSV_COLS])
 
 
 if __name__ == '__main__':

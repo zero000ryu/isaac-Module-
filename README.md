@@ -62,6 +62,7 @@
 | 統一編號 | 財政部 全國營業(稅籍)登記（每週一比對） | 很低：醫療業免營業稅，多數診所沒有稅籍登記 |
 | Google 評分、評論數、網站 | Google Places API（`scripts/enrich_google.py`） | 需設定金鑰，見下方 |
 | LINE、Facebook、Email、負責人、統編 | 診所官網公開資訊（`scripts/enrich_web.py`，遵守 robots.txt） | 有網站的診所才有 |
+| 看診牙醫姓名 | 健保署院所查詢公開的計畫醫師名單（牙周病統合治療、身心障礙服務、牙齒外傷急症）與醫療團名單（`scripts/fetch_dentists.py`，每天更新約 600 筆、30 天輪完） | 參加這些計畫的醫師；其他醫師沒有公開名單 |
 | 任何欄位的人工修正 | `data/dental-extra.csv`（以醫事機構代碼對應，優先採用） | — |
 
 **啟用 Google 評分**：到 Google Cloud 啟用「Places API (New)」並建立 API 金鑰，再到 GitHub repo 的 Settings → Secrets and variables → Actions 新增 `GOOGLE_MAPS_API_KEY`。每天預設查 30 間（約每月 900 次，在 Google 每月免費額度內），可用 repo 變數 `GOOGLE_LIMIT` 調高以加快輪完全部診所。Places API 會依用量計費，請先在 Google Cloud 設好預算上限；Google 的條款限制評分等內容的長期快取，使用前請自行確認。
@@ -71,7 +72,7 @@
   - 範圍：repo 變數 `ERP_SCOPE`，預設 `open`（全部營業中）；可設 `nhi`（只有健保特約）或縣市清單如 `臺北市,新北市`。
   - 另外也有固定網址 `data/dental.csv`、`data/dental.json` 可供其他系統匯入。
 
-**未收錄的來源**：牙醫師公會、牙醫師學會沒有公開的批次名冊；Google 地圖網頁不允許爬取，只能透過官方 API。
+**未收錄的來源**：各縣市牙醫師公會中只有臺北市、新竹市公開診所名單，且負責醫師姓名遮蔽或未列出，資料也已涵蓋在健保署與衛福部名單內；Google 地圖網頁不允許爬取，只能透過官方 API。
 
 ## 注意
 - 冷氣與全熱交換器的尺寸、能力建議只是參考，實際請以原廠型錄與技師評估為準

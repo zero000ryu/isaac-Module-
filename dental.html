@@ -204,7 +204,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
   <div class="head"><h2 id="searchTitle">搜尋診所</h2></div>
   <div class="filters">
     <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="q" placeholder="診所名稱、地址、電話、機構代碼、負責人、LINE…" aria-label="搜尋"></div>
+      <input type="search" id="q" placeholder="診所名稱、地址、電話、牙醫師姓名、機構代碼、LINE…" aria-label="搜尋"></div>
     <select id="fCity" aria-label="縣市"><option value="">全部縣市</option></select>
     <select id="fDist" aria-label="鄉鎮市區"><option value="">全部區域</option></select>
     <select id="fStatus" aria-label="狀態">
@@ -224,6 +224,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
     <label><input type="checkbox" data-f="sat">週六有看診</label>
     <label><input type="checkbox" data-f="sun">週日有看診</label>
     <label><input type="checkbox" data-f="multi">2 位以上牙醫師</label>
+    <label><input type="checkbox" data-f="doctors">有醫師名單</label>
   </div>
   <div class="result-bar"><span id="count" aria-live="polite"></span><span class="sp"></span><button class="btn sm" id="reset" type="button">清除條件</button></div>
   <div class="table-wrap">
@@ -286,7 +287,7 @@ const ymd = s => s && s.length === 8 ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slic
 /* ---------- load ---------- */
 fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
   meta = d.meta; all = d.clinics;
-  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
+  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, (c.doctors || []).join(' '), c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
   init();
 }).catch(e => {
   $('#loading').innerHTML = '無法載入資料（' + esc(e.message) + '）。<br>請透過網站網址開啟本頁；若直接以檔案開啟，瀏覽器會擋下資料讀取，可在專案資料夾執行 <code>python3 -m http.server</code> 再開啟 http://localhost:8000/dental.html';
@@ -300,7 +301,7 @@ function init() {
   $('#fCity').innerHTML = '<option value="">全部縣市</option>' + cities.map(c => `<option>${c}</option>`).join('');
   const s = meta.sources || {};
   $('#sources').innerHTML = '資料來源：' + Object.values(s).filter(x => x.used !== false).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join('、') +
-    '。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
+    '。看診牙醫取自健保署院所查詢公開的計畫醫師名單（牙周病統合治療、身心障礙服務、牙齒外傷急症）與醫療團名單，未參加這些計畫的醫師不會列出。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
   restore(); tiles(); charts(); apply();
 }
 
@@ -314,7 +315,8 @@ function tiles() {
   $('#tOpen').textContent = fmt(open.length); $('#tOpenS').textContent = `另有 ${fmt(all.length - open.length)} 間已終止`;
   $('#tNhi').textContent = fmt(nhi.length); $('#tNhiS').textContent = pct(nhi.length);
   $('#tSelf').textContent = fmt(self.length); $('#tSelfS').textContent = pct(self.length);
-  $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '';
+  const named = open.filter(c => c.doctors && c.doctors.length).length;
+  $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = (withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '') + (named ? ` · ${fmt(named)} 間有醫師名單` : '');
   $('#tG').textContent = fmt(g.length);
   $('#tGS').textContent = g.length ? `平均 ${(g.reduce((s, c) => s + c.googleRating, 0) / g.length).toFixed(2)} ★` : '尚未設定 Google API';
   $('#tLine').textContent = fmt(line.length); $('#tLineS').textContent = line.length ? pct(line.length) : '需先取得診所網站';
@@ -423,6 +425,7 @@ function apply() {
     if (f.sat && !satOpen(c)) return false;
     if (f.sun && !sunOpen(c)) return false;
     if (f.multi && !(c.dentists >= 2)) return false;
+    if (f.doctors && !(c.doctors && c.doctors.length)) return false;
     if (terms.length && !terms.every(t => c._hay.includes(t)) && !(qd.length >= 4 && digits(c.phone).includes(qd))) return false;
     return true;
   });
@@ -455,7 +458,7 @@ function renderPage() {
       `<a href="${esc(mapUrl(c))}" target="_blank" rel="noopener">地圖</a>`,
     ].filter(Boolean).join('');
     return `<tr data-code="${esc(c.code)}" tabindex="0">
-      <td><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.city || '')}${esc(c.district || '')}${c.owner ? ' · 負責人 ' + esc(c.owner) : ''}</div></td>
+      <td><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.city || '')}${esc(c.district || '')}${c.owner ? ' · 負責人 ' + esc(c.owner) : ''}</div>${c.doctors ? `<div class="sub">醫師：${esc(c.doctors.slice(0, 4).join('、'))}${c.doctors.length > 4 ? ` 等 ${c.doctors.length} 位` : ''}</div>` : ''}</td>
       <td><div>${esc((c.address || '').replace(c.city || '', '').replace(c.district || '', ''))}</div><div class="sub mono">${c.phone ? `<a href="tel:${digits(c.phone)}">${esc(c.phone)}</a>` : ''}</div></td>
       <td><span class="badge ${badge}">${esc(c.status)}</span></td>
       <td class="num">${c.googleRating != null ? `<span class="star mono">${c.googleRating.toFixed(1)} ★</span><div class="sub mono">${fmt(c.googleReviews)} 則</div>` : '<span class="sub">—</span>'}</td>
@@ -520,6 +523,7 @@ function openDetail(c) {
     ${row('機構代碼', `<span class="mono">${esc(c.code)}</span>`)}
     ${row('機構類別', esc(c.kind))}
     ${row('診療科別', esc((c.specs || []).join('、')))}
+    ${row('看診牙醫', c.doctors ? esc(c.doctors.join('、')) + `<div class="sub" style="margin-top:2px">${Object.entries(c.doctorPrograms || {}).map(([p, n]) => `${({ BD: '牙周病統合治療', C6: '身心障礙服務', CT: '牙齒外傷急症', team: '醫療團' })[p] || p}：${n.length} 位`).join('　')}</div>` : '')}
     ${row('人員', c.dentists != null ? `牙醫師 ${c.dentists} 位` + (c.staff ? `、護理 ${c.staff.nurses} 位、牙技 ${c.staff.techs} 位` : '') : '')}
     ${row('Google', c.googleRating != null ? `${c.googleRating.toFixed(1)} ★（${fmt(c.googleReviews)} 則評論）<span class="sub"> · ${esc(c.googleFetched || '')}</span>` : '')}
     ${row('網站', c.website ? link(c.website) : '')}
@@ -551,7 +555,7 @@ $('#dAdd').addEventListener('click', async () => {
     if (list.some(x => x.code === c.code || (x.name === c.name && digits(x.phone) === digits(c.phone)))) { toast('「' + c.name + '」已在我的名單裡'); return; }
     const now = new Date().toISOString();
     list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: c.name, specs: ['牙科'], city: c.city || '', district: c.district || '',
-      address: c.address || '', phone: c.phone || '', mobile: '', doctor: c.owner || '', contact: '', email: c.email || '', website: c.website || '', code: c.code,
+      address: c.address || '', phone: c.phone || '', mobile: '', doctor: c.owner || (c.doctors || []).join('、'), contact: '', email: c.email || '', website: c.website || '', code: c.code,
       nhi: c.status === '健保特約' ? '是' : '否', hours: c.hoursNote || '', status: '潛在客戶', source: '全台牙醫診所資料庫', lastContact: '', nextFollow: '',
       tags: c.line ? ['LINE ' + c.line] : [], notes: [c.taxId ? '統編 ' + c.taxId : '', c.googleRating != null ? `Google ${c.googleRating}★ (${c.googleReviews})` : ''].filter(Boolean).join('；'),
       createdAt: now, updatedAt: now });
@@ -564,12 +568,12 @@ $('#dAdd').addEventListener('click', async () => {
 $('#exportBtn').addEventListener('click', () => {
   if (!view.length) return toast('目前沒有資料可匯出');
   // headers match clinics.html import so the file can be imported there directly
-  const H = ['診所名稱','科別','縣市','鄉鎮市區','地址','電話','負責醫師','Email','網站','醫事機構代碼','健保特約','門診時間','標籤','備註','統一編號','LINE','Facebook','Google評分','Google評論數','牙醫師人數','狀態說明'];
+  const H = ['診所名稱','科別','縣市','鄉鎮市區','地址','電話','負責醫師','Email','網站','醫事機構代碼','健保特約','門診時間','標籤','備註','統一編號','LINE','Facebook','Google評分','Google評論數','牙醫師人數','狀態說明','看診牙醫'];
   const days = ['一','二','三','四','五','六','日'], parts = ['上午','下午','晚上'];
   const hrs = h => h ? days.map((d, i) => { const p = parts.filter((_, j) => h[i*3+j] === '1'); return p.length ? d + p.join('') : ''; }).filter(Boolean).join(' ') : '';
   const cell = v => { v = String(v ?? ''); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [H.join(',')].concat(view.map(c => [c.name, (c.specs || []).join('、'), c.city, c.district, c.address, c.phone, c.owner, c.email, c.website, c.code,
-    c.status === '健保特約' ? '是' : '否', hrs(c.hours), '', c.hoursNote, c.taxId, c.line, c.facebook, c.googleRating, c.googleReviews, c.dentists, c.status].map(cell).join(',')));
+    c.status === '健保特約' ? '是' : '否', hrs(c.hours), '', c.hoursNote, c.taxId, c.line, c.facebook, c.googleRating, c.googleReviews, c.dentists, c.status, (c.doctors || []).join('、')].map(cell).join(',')));
   saveFile(`牙醫診所_${$('#fCity').value || '全台'}_${new Date().toISOString().slice(0, 10)}.csv`, '\uFEFF' + lines.join('\r\n'), `已匯出 ${fmt(view.length)} 筆`);
 });
 

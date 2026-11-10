@@ -43,6 +43,10 @@ jobs:
         run: python scripts/enrich_google.py
       - name: LINE, Facebook, 統編, 負責人 from clinic websites
         run: python scripts/enrich_web.py --limit 400
+      - name: Dentist names from NHI programme lists (incremental, about 600 lookups a day)
+        run: |
+          pip install --quiet pypdf
+          python scripts/fetch_dentists.py --limit 600
       - name: Merge enrichments
         run: python scripts/build_dental.py --cache
       - id: commit
