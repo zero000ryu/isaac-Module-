@@ -566,7 +566,7 @@ def fill_geo(c, addresses, geo):
 
 def match_tda(clinics, tda):
     """Attach the Taipei Dental Association entry to its clinic and resolve the masked 負責醫師."""
-    taipei = [c for c in clinics if c.get('city') == '臺北市' and c['status'] != '已終止']
+    taipei = [c for c in clinics if c.get('city') == '臺北市' and c['status'] != '已終止' and c.get('type') == '診所']
     by_name = {}
     for c in taipei:
         by_name.setdefault(norm_name(c['name']), []).append(c)
@@ -584,11 +584,11 @@ def match_tda(clinics, tda):
             c['fax'] = e['fax']
         if e.get('website') and not c.get('website') and e['website'].startswith('http') and 'line.me' not in e['website']:
             c['website'] = e['website']
-        mask = e.get('ownerMasked', '')
-        if not mask:
+        mask = e.get('ownerMasked', '').strip()
+        if len(mask) < 2 or not re.match(r'[\u4e00-\u9fff]', mask):
             continue
         c['ownerMasked'] = mask
-        rx = re.compile('^' + re.sub(r'[OＯ○〇0*＊]', '.', re.escape(mask).replace('\\', '')) + '$')
+        rx = re.compile('^' + ''.join('.' if ch in 'OＯ○〇0*＊?？xXＸ' else re.escape(ch) for ch in mask) + '$')
         hits = [d for d in c.get('doctors', []) if rx.match(d)]
         if len(hits) == 1 and not c.get('owner'):
             c['owner'] = hits[0]
