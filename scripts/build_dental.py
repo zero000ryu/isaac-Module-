@@ -353,7 +353,8 @@ def main():
     meta['sources']['nhiDetail'] = {'name': '健保署 院所查詢（計畫、掛號費、無障礙、預防保健）', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1000S01', 'records': len(detail)}
     meta['sources']['nhiDoctors'] = {'name': '健保署 牙醫計畫院所查詢醫師名單與醫療團名單', 'url': 'https://info.nhi.gov.tw/INAE1000/INAE1020S01', 'records': len(dentists)}
     os.makedirs(DATA, exist_ok=True)
-    clinics = scrub(clinics)
+    clinics, meta = scrub(clinics), scrub(meta)
+    quality = scrub(quality)
     with open(os.path.join(DATA, 'dental.json'), 'w', encoding='utf-8') as f:
         json.dump({'meta': meta, 'clinics': clinics}, f, ensure_ascii=False, separators=(',', ':'))
     write_csv(clinics)
@@ -522,7 +523,7 @@ def scrub(v):
     if isinstance(v, list):
         return [scrub(x) for x in v]
     if isinstance(v, dict):
-        return {k: scrub(x) for k, x in v.items()}
+        return {scrub(k): scrub(x) for k, x in v.items()}
     return v
 
 
