@@ -21,6 +21,9 @@ RE_IG = re.compile(r'https?://(?:www\.)?instagram\.com/(?!p/|explore|accounts)([
 RE_MAIL = re.compile(r'mailto:([\w.+\-]+@[\w\-]+\.[\w.\-]+)', re.I)
 RE_TAX = re.compile(r'統一?編(?:號)?\s*[：:]?\s*(\d{8})')
 RE_OWNER = re.compile(r'(?:負責(?:醫師|人)|院\s*長)\s*[：:]\s*([一-鿿]{2,4})(?:\s*醫師)?')
+# link (not content) to the clinic's own schedule page: medical-institution sites must forbid
+# republishing their content (醫療機構網際網路資訊管理辦法 第4條), but linking is allowed
+RE_SCHEDULE = re.compile(r'<a[^>]+href=["\']([^"\'#]+)["\'][^>]*>(?:(?!</a>).){0,200}?(門診時間|門診表|看診時間|看診表|醫師班表|門診時刻|看診時段|門診資訊)', re.I | re.S)
 RE_CONTACT = re.compile(r'href=["\']([^"\']*(?:contact|about|聯絡|關於)[^"\']*)["\']', re.I)
 
 _robots = {}
@@ -85,6 +88,9 @@ def visit(site):
     try:
         page = get(site)
         found.update(extract(page))
+        m = RE_SCHEDULE.search(page)
+        if m:
+            found['schedulePage'] = urllib.parse.urljoin(site, html.unescape(m.group(1)))
         m = RE_CONTACT.search(page)
         if m and len(found) < 4:
             found = {**extract(get(urllib.parse.urljoin(site, m.group(1)))), **found}

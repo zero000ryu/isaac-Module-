@@ -69,6 +69,13 @@ header.top{display:flex;align-items:center;gap:12px;padding-block:16px 6px;flex-
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .charts{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}
+.qgrid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px}
+.qstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.qstat{border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:left;background:none}
+button.qstat:hover{border-color:var(--accent)}
+.qstat .v{font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums}
+.qstat .k{font-size:12px;color:var(--muted)}
+.chk{font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--warn);color:var(--ink);white-space:nowrap}
 
 /* horizontal stacked bars, HTML-based so they reflow on phones */
 .bars{display:flex;flex-direction:column;gap:2px}
@@ -122,6 +129,7 @@ tbody tr:last-child td{border-bottom:none}
 .badge.nhi{border-color:var(--series-1)}
 .badge.self{border-color:var(--series-2)}
 .badge.end{color:var(--muted)}
+.badge.hosp{border-color:var(--accent)}
 .links{display:flex;gap:6px;flex-wrap:wrap}
 .links a,.links span{font-size:12px;white-space:nowrap}
 .star{white-space:nowrap}
@@ -138,8 +146,8 @@ dialog .df{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--lin
 dl.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 12px;margin:0}
 dl.kv dt{color:var(--muted);font-size:13px}
 dl.kv dd{margin:0;overflow-wrap:anywhere}
-.hours{display:grid;grid-template-columns:36px repeat(7,minmax(0,1fr));gap:2px;font-size:12px;margin-top:4px;max-width:360px}
-.hours div{text-align:center;padding:2px 0;border-radius:4px}
+.hours{display:grid;grid-template-columns:36px repeat(7,minmax(0,1fr));gap:2px;font-size:12px;margin-top:4px;max-width:420px}
+.hours div{text-align:center;padding:2px 0;border-radius:4px;line-height:1.25}
 .hours .on{background:var(--accent-soft);color:var(--ink)}
 .hours .off{color:var(--muted)}
 .hours .h{color:var(--muted)}
@@ -149,7 +157,7 @@ dl.kv dd{margin:0;overflow-wrap:anywhere}
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
 footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
 
-@media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} .charts{grid-template-columns:1fr} }
+@media (max-width:1000px){ .tiles{grid-template-columns:repeat(3,minmax(0,1fr))} .charts,.qgrid{grid-template-columns:1fr} }
 @media (max-width:640px){
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .btn .lbl{display:none}
@@ -179,12 +187,12 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
 <div id="loading" class="loading">正在載入全台牙醫診所資料…</div>
 <main id="app" hidden>
 <section class="tiles" aria-label="總覽">
-  <div class="tile"><div class="k">營業中診所</div><div class="v" id="tOpen"></div><div class="s" id="tOpenS"></div></div>
-  <div class="tile"><div class="k">健保特約</div><div class="v" id="tNhi"></div><div class="s" id="tNhiS"></div></div>
-  <div class="tile"><div class="k">自費（無健保特約）</div><div class="v" id="tSelf"></div><div class="s" id="tSelfS"></div></div>
+  <div class="tile"><div class="k">營業中（診所＋醫院）</div><div class="v" id="tOpen"></div><div class="s" id="tOpenS"></div></div>
+  <div class="tile"><div class="k">健保特約診所</div><div class="v" id="tNhi"></div><div class="s" id="tNhiS"></div></div>
+  <div class="tile"><div class="k">自費診所（無健保）</div><div class="v" id="tSelf"></div><div class="s" id="tSelfS"></div></div>
   <div class="tile"><div class="k">執業牙醫師</div><div class="v" id="tDent"></div><div class="s" id="tDentS"></div></div>
   <div class="tile"><div class="k">有 Google 評分</div><div class="v" id="tG"></div><div class="s" id="tGS"></div></div>
-  <div class="tile"><div class="k">有 LINE 官方帳號</div><div class="v" id="tLine"></div><div class="s" id="tLineS"></div></div>
+  <div class="tile"><div class="k">醫院牙科</div><div class="v" id="tHosp"></div><div class="s" id="tHospS"></div></div>
 </section>
 
 <div class="charts">
@@ -192,7 +200,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
     <div class="head"><h2 id="cityTitle">各縣市牙醫診所數</h2><span class="sub">點縣市即可篩選下方名單</span><span class="sp"></span>
       <div class="legend"><span><i style="background:var(--series-1)"></i>健保特約</span><span><i style="background:var(--series-2)"></i>自費</span></div></div>
     <div class="bars" id="cityBars" role="group" aria-label="各縣市診所數"></div>
-    <details class="tbl"><summary>以表格檢視</summary><div class="table-wrap"><table><thead><tr><th>縣市</th><th class="num">健保特約</th><th class="num">自費</th><th class="num">合計</th><th class="num">牙醫師</th></tr></thead><tbody id="cityTable"></tbody></table></div></details>
+    <details class="tbl"><summary>以表格檢視</summary><div class="table-wrap"><table><thead><tr><th>縣市</th><th class="num">健保特約</th><th class="num">自費</th><th class="num">合計</th><th class="num">醫院牙科</th><th class="num">牙醫師</th></tr></thead><tbody id="cityTable"></tbody></table></div></details>
   </section>
   <section class="card" aria-labelledby="distTitle">
     <div class="head"><h2 id="distTitle">鄉鎮市區</h2><span class="sub" id="distSub"></span></div>
@@ -200,19 +208,28 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
   </section>
 </div>
 
+<section class="card" aria-labelledby="qTitle">
+  <div class="head"><h2 id="qTitle">資料完整度與比對</h2><span class="sub" id="qSub"></span></div>
+  <div class="qgrid">
+    <div><div class="sub" style="margin-bottom:6px">營業中診所各欄位有資料的比例</div><div class="bars single" id="covBars" role="group" aria-label="欄位完整度"></div></div>
+    <div><div class="sub" style="margin-bottom:6px">各來源交叉比對結果</div><div class="qstats" id="qStats"></div></div>
+  </div>
+</section>
+
 <section class="card" aria-labelledby="searchTitle">
   <div class="head"><h2 id="searchTitle">搜尋診所</h2></div>
   <div class="filters">
     <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="q" placeholder="診所名稱、地址、電話、機構代碼、負責人、LINE…" aria-label="搜尋"></div>
+      <input type="search" id="q" placeholder="診所名稱、地址、電話、牙醫師姓名、機構代碼、LINE…" aria-label="搜尋"></div>
     <select id="fCity" aria-label="縣市"><option value="">全部縣市</option></select>
     <select id="fDist" aria-label="鄉鎮市區"><option value="">全部區域</option></select>
-    <select id="fStatus" aria-label="狀態">
-      <option value="open">營業中</option><option value="健保特約">健保特約</option><option value="自費">自費</option><option value="已終止">已終止特約／歇業</option><option value="">全部（含已終止）</option>
+    <select id="fStatus" aria-label="機構類型">
+      <option value="open">營業中（全部類型）</option><option value="健保特約診所">健保特約診所</option><option value="自費診所">自費診所</option><option value="醫院牙科">醫院牙科（全部）</option><option value="醫學中心">醫院牙科：醫學中心</option><option value="區域醫院">醫院牙科：區域醫院</option><option value="地區醫院">醫院牙科：地區醫院</option><option value="已歇業／終止">已歇業／終止</option><option value="">全部（含已終止）</option>
     </select>
+    <select id="fSpecialty" aria-label="專科"><option value="">全部專科與服務</option></select>
     <select id="sortSel" aria-label="排序">
       <option value="city">依地區排序</option><option value="name">依名稱排序</option><option value="rating">Google 評分高→低</option>
-      <option value="reviews">評論數多→少</option><option value="dentists">牙醫師人數多→少</option><option value="since">特約最久</option><option value="newest">最新開業</option>
+      <option value="reviews">評論數多→少</option><option value="dentists">牙醫師人數多→少</option><option value="since">特約最久</option><option value="newest">最新開業</option><option value="complete">資料最完整</option>
     </select>
   </div>
   <div class="checks" role="group" aria-label="條件">
@@ -224,6 +241,9 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
     <label><input type="checkbox" data-f="sat">週六有看診</label>
     <label><input type="checkbox" data-f="sun">週日有看診</label>
     <label><input type="checkbox" data-f="multi">2 位以上牙醫師</label>
+    <label><input type="checkbox" data-f="doctors">有醫師名單</label>
+    <label><input type="checkbox" data-f="checks">需查證（來源不一致）</label>
+    <label><input type="checkbox" data-f="owner">有院長資料</label>
   </div>
   <div class="result-bar"><span id="count" aria-live="polite"></span><span class="sp"></span><button class="btn sm" id="reset" type="button">清除條件</button></div>
   <div class="table-wrap">
@@ -286,7 +306,7 @@ const ymd = s => s && s.length === 8 ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slic
 /* ---------- load ---------- */
 fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
   meta = d.meta; all = d.clinics;
-  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
+  for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, (c.doctors || []).join(' '), (c.aliases || []).join(' '), (c.specialties || []).join(' '), c.zip, c.village, c.hospitalLevel, c.category, (c.programs || []).join(' '), c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
   init();
 }).catch(e => {
   $('#loading').innerHTML = '無法載入資料（' + esc(e.message) + '）。<br>請透過網站網址開啟本頁；若直接以檔案開啟，瀏覽器會擋下資料讀取，可在專案資料夾執行 <code>python3 -m http.server</code> 再開啟 http://localhost:8000/dental.html';
@@ -300,16 +320,22 @@ function init() {
   $('#fCity').innerHTML = '<option value="">全部縣市</option>' + cities.map(c => `<option>${c}</option>`).join('');
   const s = meta.sources || {};
   $('#sources').innerHTML = '資料來源：' + Object.values(s).filter(x => x.used !== false).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join('、') +
-    '。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
-  restore(); tiles(); charts(); apply();
+    '。看診牙醫取自健保署院所查詢公開的計畫醫師名單（牙周病統合治療、身心障礙服務、牙齒外傷急症）與醫療團名單，未參加這些計畫的醫師不會列出。Google 評分與網站經 Google Places API 取得；LINE、統編、負責人取自診所官網公開資訊，可能不完整，請以實際查證為準。「已終止」指健保特約已到期且未出現在衛福部最新機構清單。';
+  const cnt = {}; all.filter(isOpen).forEach(c => (c.specialties || []).forEach(x => cnt[x] = (cnt[x] || 0) + 1));
+  const SERVICES = ['牙周病統合治療', '身心障礙特殊需求', '牙齒外傷急症', '兒童齲齒照護（0–6 歲）', '牙醫到宅醫療', '偏鄉巡迴醫療'];
+  const opt = x => `<option value="${esc(x)}">${esc(x)}（${fmt(cnt[x])}）</option>`;
+  const depts = Object.keys(cnt).filter(x => !SERVICES.includes(x)).sort((a, b) => cnt[b] - cnt[a]);
+  $('#fSpecialty').innerHTML = '<option value="">全部專科與服務</option>' + `<optgroup label="科別">${depts.map(opt).join('')}</optgroup>` +
+    `<optgroup label="服務項目（健保計畫）">${SERVICES.filter(x => cnt[x]).map(opt).join('')}</optgroup>`;
+  restore(); tiles(); charts(); quality(); apply();
 }
 
 /* ---------- tiles ---------- */
 function tiles() {
-  const open = all.filter(isOpen), nhi = open.filter(c => c.status === '健保特約'), self = open.filter(c => c.status === '自費');
+  const open = all.filter(isOpen), nhi = open.filter(c => c.category === '健保特約診所'), self = open.filter(c => c.category === '自費診所');
   const dent = open.reduce((s, c) => s + (c.dentists || 0), 0);
   const withDent = open.filter(c => c.dentists).length;
-  const g = open.filter(c => c.googleRating != null), line = open.filter(c => c.line);
+  const g = open.filter(c => c.googleRating != null);
   const pct = n => open.length ? (n / open.length * 100).toFixed(1) + '%' : '';
   $('#tOpen').textContent = fmt(open.length); $('#tOpenS').textContent = `另有 ${fmt(all.length - open.length)} 間已終止`;
   $('#tNhi').textContent = fmt(nhi.length); $('#tNhiS').textContent = pct(nhi.length);
@@ -317,7 +343,25 @@ function tiles() {
   $('#tDent').textContent = fmt(dent); $('#tDentS').textContent = withDent ? `平均每間 ${(dent / withDent).toFixed(1)} 位` : '';
   $('#tG').textContent = fmt(g.length);
   $('#tGS').textContent = g.length ? `平均 ${(g.reduce((s, c) => s + c.googleRating, 0) / g.length).toFixed(2)} ★` : '尚未設定 Google API';
-  $('#tLine').textContent = fmt(line.length); $('#tLineS').textContent = line.length ? pct(line.length) : '需先取得診所網站';
+  const hosp = open.filter(c => c.type === '醫院'), lv = l => hosp.filter(c => c.hospitalLevel === l).length;
+  $('#tHosp').textContent = fmt(hosp.length); $('#tHospS').textContent = `醫學中心 ${lv('醫學中心')}・區域 ${lv('區域醫院')}・地區 ${lv('地區醫院')}`;
+}
+
+/* ---------- data quality ---------- */
+function quality() {
+  const q = meta.quality; if (!q) { $('#qTitle').closest('section').hidden = true; return; }
+  const L = { phone: '電話', address: '地址', hours: '看診時段', zip: '郵遞區號', dentists: '牙醫師人數', doctors: '醫師姓名', programs: '健保計畫', regFee: '掛號費',
+    website: '網站', line: 'LINE', email: 'Email', taxId: '統一編號', owner: '院長', googleRating: 'Google 評分' };
+  const rows = Object.entries(q.fieldCoverage).map(([k, v]) => ({ key: L[k] || k, a: v })).sort((x, y) => y.a - x.a);
+  barRows($('#covBars'), rows, q.openClinics, true);
+  $('#covBars').querySelectorAll('.val').forEach((el, i) => el.textContent = Math.round(rows[i].a / q.openClinics * 100) + '%');
+  bindTips($('#covBars'), k => { const r = rows.find(x => x.key === k); return `<b>${esc(k)}</b><div class="r"><span>有資料</span><span class="mono">${fmt(r.a)} / ${fmt(q.openClinics)}</span></div>`; });
+  $('#qSub').textContent = `平均完整度 ${q.avgCompleteness}% · ${fmt(q.namedDentists)} 位具名牙醫分布在 ${fmt(q.clinicsWithDoctors)} 間診所`;
+  const st = [['電話不一致', q.phoneConflicts, '健保署與衛福部登記的市話不同'], ['名稱不一致', q.nameDiffs, '可能已改名'], ['地址不一致', q.addressDiffs, '可能已遷址'],
+    ['看診時段與 Google 不一致', q.hoursDiffer || 0, `已比對 ${fmt(q.hoursCompared || 0)} 間（需 Google API 金鑰）`], ['同址多家機構', q.sharedAddress, '同一門牌登記多個機構代碼'], ['舊址已由新機構接手', q.relocations, '已終止機構與現有機構同址'], ['在多間診所看診的醫師', q.dentistsAtSeveralClinics, '支援醫師或同名同姓']];
+  $('#qStats').innerHTML = st.map(([k, v, t]) => `<div class="qstat" title="${esc(t)}"><div class="v">${fmt(v)}</div><div class="k">${esc(k)}</div></div>`).join('')
+    + `<button type="button" class="qstat" id="qShow"><div class="v">${fmt(all.filter(c => c.checks).length)}</div><div class="k">顯示需查證的診所 →</div></button>`;
+  $('#qShow').onclick = () => { document.querySelector('.checks input[data-f=checks]').checked = true; page = 0; apply(); save(); $('#searchTitle').scrollIntoView({ behavior: 'smooth' }); };
 }
 
 /* ---------- charts ---------- */
@@ -349,6 +393,7 @@ function charts() {
     if (!isOpen(c)) continue;
     const k = c.city || '未知';
     const o = byCity[k] || (byCity[k] = { key: k, a: 0, b: 0, dent: 0 });
+    if (c.type === '醫院') { o.h = (o.h || 0) + 1; continue; }
     c.status === '健保特約' ? o.a++ : o.b++;
     o.dent += c.dentists || 0;
   }
@@ -357,11 +402,12 @@ function charts() {
   rows.forEach(r => r.on = r.key === cityPick);
   barRows($('#cityBars'), rows, max, false);
   const sum = rows.reduce((s, r) => s + r.a + r.b, 0);
-  $('#cityTable').innerHTML = rows.map(r => `<tr><td>${r.key}</td><td class="num mono">${fmt(r.a)}</td><td class="num mono">${fmt(r.b)}</td><td class="num mono">${fmt(r.a + r.b)}</td><td class="num mono">${fmt(r.dent)}</td></tr>`).join('');
+  $('#cityTable').innerHTML = rows.map(r => `<tr><td>${r.key}</td><td class="num mono">${fmt(r.a)}</td><td class="num mono">${fmt(r.b)}</td><td class="num mono">${fmt(r.a + r.b)}</td><td class="num mono">${fmt(r.h || 0)}</td><td class="num mono">${fmt(r.dent)}</td></tr>`).join('');
   bindTips($('#cityBars'), k => { const r = byCity[k]; const t = r.a + r.b;
     return `<b>${esc(k)}</b><div class="r"><span><i style="background:var(--series-1)"></i>健保特約</span><span class="mono">${fmt(r.a)}</span></div>
       <div class="r"><span><i style="background:var(--series-2)"></i>自費</span><span class="mono">${fmt(r.b)}</span></div>
       <div class="r"><span>合計</span><span class="mono">${fmt(t)}（全台 ${(t / sum * 100).toFixed(1)}%）</span></div>
+      <div class="r"><span>另有醫院牙科</span><span class="mono">${fmt(r.h || 0)}</span></div>
       <div class="r"><span>牙醫師</span><span class="mono">${fmt(r.dent)}</span></div>`; });
   districtChart();
 }
@@ -409,10 +455,10 @@ function fillDistricts() {
 function apply() {
   const terms = $('#q').value.trim().toLowerCase().replace(/台/g, '臺').split(/\s+/).filter(Boolean);
   const qd = digits($('#q').value);
-  const city = $('#fCity').value, dist = $('#fDist').value, st = $('#fStatus').value;
+  const city = $('#fCity').value, dist = $('#fDist').value, st = $('#fStatus').value, spec = $('#fSpecialty').value;
   const f = {}; document.querySelectorAll('.checks input').forEach(i => f[i.dataset.f] = i.checked);
   view = all.filter(c => {
-    if (st === 'open' ? !isOpen(c) : st && c.status !== st) return false;
+    if (st === 'open' ? !isOpen(c) : st && c.category !== st && !(c.hospitalLevel === st && isOpen(c))) return false;
     if (city && c.city !== city) return false;
     if (dist && c.district !== dist) return false;
     if (f.website && !c.website) return false;
@@ -423,6 +469,10 @@ function apply() {
     if (f.sat && !satOpen(c)) return false;
     if (f.sun && !sunOpen(c)) return false;
     if (f.multi && !(c.dentists >= 2)) return false;
+    if (f.doctors && !(c.doctors && c.doctors.length)) return false;
+    if (f.checks && !(c.checks && c.checks.length)) return false;
+    if (f.owner && !c.owner) return false;
+    if (spec && !(c.specialties || []).includes(spec)) return false;
     if (terms.length && !terms.every(t => c._hay.includes(t)) && !(qd.length >= 4 && digits(c.phone).includes(qd))) return false;
     return true;
   });
@@ -435,6 +485,7 @@ function apply() {
     dentists: (a, b) => (b.dentists || 0) - (a.dentists || 0) || zh(a.name, b.name),
     since: (a, b) => (a.nhiSince || '99999999').localeCompare(b.nhiSince || '99999999'),
     newest: (a, b) => (b.nhiSince || '').localeCompare(a.nhiSince || ''),
+    complete: (a, b) => (b.completeness || 0) - (a.completeness || 0) || zh(a.name, b.name),
   }[s];
   view.sort(cmp);
   $('#count').textContent = `找到 ${fmt(view.length)} 間診所`;
@@ -447,7 +498,8 @@ function renderPage() {
   page = Math.min(page, pages - 1);
   const slice = view.slice(page * PAGE, page * PAGE + PAGE);
   $('#rows').innerHTML = slice.map(c => {
-    const badge = c.status === '健保特約' ? 'nhi' : c.status === '自費' ? 'self' : 'end';
+    const badge = c.type === '醫院' ? 'hosp' : c.status === '健保特約' ? 'nhi' : c.status === '自費' ? 'self' : 'end';
+    const label = c.type === '醫院' ? (c.hospitalLevel || '醫院') : c.category;
     const links = [
       c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener">網站</a>` : '',
       c.line ? `<a href="${esc(lineUrl(c.line))}" target="_blank" rel="noopener">LINE ${esc(c.line.startsWith('http') ? '' : c.line)}</a>` : '',
@@ -455,9 +507,9 @@ function renderPage() {
       `<a href="${esc(mapUrl(c))}" target="_blank" rel="noopener">地圖</a>`,
     ].filter(Boolean).join('');
     return `<tr data-code="${esc(c.code)}" tabindex="0">
-      <td><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.city || '')}${esc(c.district || '')}${c.owner ? ' · 負責人 ' + esc(c.owner) : ''}</div></td>
+      <td><div class="name">${esc(c.name)}</div><div class="sub">${c.zip ? `<span class="mono">${esc(c.zip)}</span> ` : ''}${esc(c.city || '')}${esc(c.district || '')}${esc(c.village || '')}</div>${c.doctors ? `<div class="sub">醫師：${c.doctors.slice(0, 4).map(n => esc(n) + (c.roles && c.roles[n] ? `（${esc(c.roles[n])}）` : '')).join('、')}${c.doctors.length > 4 ? ` 等 ${c.doctors.length} 位` : ''}</div>` : ''}</td>
       <td><div>${esc((c.address || '').replace(c.city || '', '').replace(c.district || '', ''))}</div><div class="sub mono">${c.phone ? `<a href="tel:${digits(c.phone)}">${esc(c.phone)}</a>` : ''}</div></td>
-      <td><span class="badge ${badge}">${esc(c.status)}</span></td>
+      <td><span class="badge ${badge}">${esc(label)}</span>${c.checks ? `<div style="margin-top:4px"><span class="chk" title="${esc(c.checks.join('、'))}">需查證</span></div>` : ''}</td>
       <td class="num">${c.googleRating != null ? `<span class="star mono">${c.googleRating.toFixed(1)} ★</span><div class="sub mono">${fmt(c.googleReviews)} 則</div>` : '<span class="sub">—</span>'}</td>
       <td class="num mono c-dent">${c.dentists ?? '—'}</td>
       <td><div class="links">${links}</div></td>
@@ -475,35 +527,36 @@ $('#pager').addEventListener('click', e => { const b = e.target.closest('[data-p
 let qt;
 $('#q').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { page = 0; apply(); save(); }, 150); });
 $('#fCity').addEventListener('change', () => { fillDistricts(); onFilter(true); });
-['#fDist', '#fStatus'].forEach(s => $(s).addEventListener('change', () => onFilter(true)));
+['#fDist', '#fStatus', '#fSpecialty'].forEach(s => $(s).addEventListener('change', () => onFilter(true)));
 $('#sortSel').addEventListener('change', () => { page = 0; apply(); save(); });
 document.querySelectorAll('.checks input').forEach(i => i.addEventListener('change', () => { page = 0; apply(); save(); }));
 $('#reset').addEventListener('click', () => {
-  $('#q').value = ''; $('#fCity').value = ''; fillDistricts(); $('#fStatus').value = 'open'; $('#sortSel').value = 'city';
+  $('#q').value = ''; $('#fCity').value = ''; fillDistricts(); $('#fStatus').value = 'open'; $('#fSpecialty').value = ''; $('#sortSel').value = 'city';
   document.querySelectorAll('.checks input').forEach(i => i.checked = false); onFilter(true);
 });
 
 
 /* per-viewer convenience: remember filters */
 function save() {
-  try { localStorage.setItem('dental:view', JSON.stringify({ q: $('#q').value, city: $('#fCity').value, dist: $('#fDist').value, st: $('#fStatus').value, sort: $('#sortSel').value,
+  try { localStorage.setItem('dental:view', JSON.stringify({ q: $('#q').value, city: $('#fCity').value, dist: $('#fDist').value, st: $('#fStatus').value, spec: $('#fSpecialty').value, sort: $('#sortSel').value,
     f: [...document.querySelectorAll('.checks input:checked')].map(i => i.dataset.f) })); } catch (e) {}
 }
 function restore() {
   fillDistricts();
   try { const v = JSON.parse(localStorage.getItem('dental:view') || 'null'); if (!v) return;
     $('#q').value = v.q || ''; $('#fCity').value = v.city || ''; fillDistricts(); $('#fDist').value = v.dist || '';
-    $('#fStatus').value = v.st ?? 'open'; $('#sortSel').value = v.sort || 'city';
+    $('#fStatus').value = v.st ?? 'open'; $('#fSpecialty').value = v.spec || ''; $('#sortSel').value = v.sort || 'city';
     document.querySelectorAll('.checks input').forEach(i => i.checked = (v.f || []).includes(i.dataset.f)); } catch (e) {}
 }
 
 /* ---------- detail ---------- */
 const dlg = $('#dlg'); let cur = null;
-function hoursGrid(h) {
+function hoursGrid(h, times) {
   if (!h) return '<span class="sub">未提供</span>';
+  const t = (p, d) => { const v = times && times[p] && times[p][d]; return v && /^\d{4}-\d{4}$/.test(v) ? `<span class="mono" style="font-size:11px">${v.slice(0, 2)}:${v.slice(2, 4)}<br>${v.slice(5, 7)}:${v.slice(7, 9)}</span>` : '●'; };
   const days = ['一','二','三','四','五','六','日'], parts = ['上午','下午','晚上'];
   let out = '<div class="hours"><div class="h"></div>' + days.map(d => `<div class="h">${d}</div>`).join('');
-  parts.forEach((p, pi) => { out += `<div class="h">${p}</div>` + days.map((_, d) => h[d*3+pi] === '1' ? '<div class="on" aria-label="看診">●</div>' : '<div class="off" aria-label="休診">–</div>').join(''); });
+  parts.forEach((p, pi) => { out += `<div class="h">${p}</div>` + days.map((_, d) => h[d*3+pi] === '1' ? `<div class="on" aria-label="看診">${t(pi, d)}</div>` : '<div class="off" aria-label="休診">–</div>').join(''); });
   return out + '</div>';
 }
 function openDetail(c) {
@@ -512,23 +565,42 @@ function openDetail(c) {
   const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
   const link = (u, t) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t || u)}</a>`;
   $('#dBody').innerHTML = `<dl class="kv">
-    ${row('狀態', esc(c.status) + (c.nhiUntil ? `<span class="sub">（健保合約 ${ymd(c.nhiSince)} – ${ymd(c.nhiUntil)}）</span>` : ''))}
+    ${row('機構類型', esc(c.category) + (c.hospitalLevel ? `（${esc(c.hospitalLevel)}）` : ''))}
+    ${row('健保', (c.status === '健保特約' ? '健保特約' : c.status === '自費' ? '未特約（自費）' : esc(c.status)) + (c.nhiUntil ? `<span class="sub">（健保合約 ${ymd(c.nhiSince)} – ${ymd(c.nhiUntil)}）</span>` : ''))}
+    ${row('行政區', [c.zip ? `<span class="mono">${esc(c.zip)}</span>` : '', `${esc(c.city || '')}<span class="sub">（${esc(c.cityType || '')}）</span>`, `${esc(c.district || '')}<span class="sub">（${esc(c.districtType || '')}）</span>`, c.village ? `${esc(c.village)}<span class="sub">（${esc(c.villageType || '')}）</span>` : '<span class="sub">村里：地址未載明</span>'].filter(Boolean).join(' '))}
     ${row('地址', esc(c.address))}
-    ${row('電話', c.phone ? `<a href="tel:${digits(c.phone)}" class="mono">${esc(c.phone)}</a>` : '')}
-    ${row('負責人', esc(c.owner))}
+    ${row('電話', c.phone ? `<a href="tel:${digits(c.phone)}" class="mono">${esc(c.phone)}</a>` + (c.otherPhones ? `<div class="sub mono">其他：${esc(c.otherPhones.join('、'))}</div>` : '') : '')}
+    ${row('其他名稱', esc((c.aliases || []).join('、')))}
+    ${row('其他地址', esc((c.otherAddresses || []).join('；')))}
+    ${row('院長（負責醫師）', c.owner ? esc(c.owner) + (c.ownerSource ? `<div class="sub">${esc(c.ownerSource)}</div>` : '') : (c.ownerMasked ? esc(c.ownerMasked) + '<div class="sub">臺北市牙醫師公會登記（姓名遮蔽）</div>' : ''))}
+    ${row('傳真', c.fax ? `<span class="mono">${esc(c.fax)}</span>` : '')}
     ${row('統一編號', c.taxId ? `<span class="mono">${esc(c.taxId)}</span>` : '')}
     ${row('機構代碼', `<span class="mono">${esc(c.code)}</span>`)}
     ${row('機構類別', esc(c.kind))}
     ${row('診療科別', esc((c.specs || []).join('、')))}
+    ${row('看診牙醫', c.doctors ? c.doctors.map(n => esc(n) + (c.roles && c.roles[n] ? `<span class="chk" style="margin-left:4px">${esc(c.roles[n])}</span>` : '')).join('、') + `<div class="sub" style="margin-top:2px">${Object.entries(c.doctorPrograms || {}).map(([p, n]) => `${({ BD: '牙周病統合治療', C6: '身心障礙服務', CT: '牙齒外傷急症', team: '醫療團' })[p] || p}：${n.length} 位`).join('　')}</div>` : '')}
     ${row('人員', c.dentists != null ? `牙醫師 ${c.dentists} 位` + (c.staff ? `、護理 ${c.staff.nurses} 位、牙技 ${c.staff.techs} 位` : '') : '')}
     ${row('Google', c.googleRating != null ? `${c.googleRating.toFixed(1)} ★（${fmt(c.googleReviews)} 則評論）<span class="sub"> · ${esc(c.googleFetched || '')}</span>` : '')}
     ${row('網站', c.website ? link(c.website) : '')}
+    ${row('醫師門診表', c.schedulePage ? link(c.schedulePage, '診所網站：醫師門診時間表') + '<div class="sub">各醫師看診時間請見診所網站</div>' : '')}
     ${row('LINE', c.line ? link(lineUrl(c.line), c.line) : '')}
     ${row('Facebook', c.facebook ? link(c.facebook) : '')}
     ${row('Instagram', c.instagram ? link(c.instagram) : '')}
     ${row('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
-    ${row('看診時段', hoursGrid(c.hours) + (c.hoursNote ? `<div class="sub" style="margin-top:4px">${esc(c.hoursNote)}</div>` : ''))}
+    ${row('參與健保計畫', esc((c.programs || []).join('、')))}
+    ${row('掛號費', esc(c.regFee))}
+    ${row('預防保健', esc((c.preventive || []).join('、')))}
+    ${row('無障礙', esc(c.accessibility))}
+    ${row('看診時段', hoursGrid(c.hours, c.hoursTimes) + (c.hoursNote ? `<div class="sub" style="margin-top:4px">${esc(c.hoursNote)}</div>` : '') + (c.hoursUpdated ? `<div class="sub">健保署資料更新：${esc(c.hoursUpdated)}（民國）</div>` : ''))}
+    ${row('Google 營業時間', c.googleHours ? hoursGrid(c.hoursCheck ? c.hoursCheck.google : '', null) + (c.googleHours.text || []).map(t => `<div class="sub">${esc(t)}</div>`).join('') : '<span class="sub">尚未取得（需設定 Google API 金鑰）</span>')}
+    ${row('時段比對', c.hoursCheck ? (c.hoursCheck.diffs.length ? c.hoursCheck.diffs.map(d => `<div><span class="chk">不一致</span> ${esc(d)}</div>`).join('') : '健保署與 Google 一致') : '')}
+    ${row('專科與服務', esc((c.specialties || []).join('、')))}
+    ${row('醫師介紹', c.doctorPage ? `<a href="${esc(c.doctorPage)}" target="_blank" rel="noopener">${c.doctorPage.includes('google.com/search') ? '搜尋此醫院的牙科醫師介紹' : '醫院網站：牙科醫師介紹'}</a><div class="sub">職稱、專長、學經歷與照片請見醫院網站</div>` : '')}
     ${row('資料來源', esc((c.sources || []).join('、')))}
+    ${row('資料完整度', c.completeness != null ? `${c.completeness}%` + (c.doctorCoverage != null ? `<span class="sub">（醫師名單涵蓋登記人數 ${c.doctorCoverage}%）</span>` : '') : '')}
+    ${row('比對注意', c.checks ? c.checks.map(x => `<span class="chk">${esc(x)}</span>`).join(' ') + (c.replacedBy ? '' : '') : '')}
+    ${row('同址機構', c.sameAddressAs ? c.sameAddressAs.map(k => esc((all.find(x => x.code === k) || {}).name || k)).join('、') : '')}
+    ${row('遷址／改設', c.replacedBy ? '同址現有：' + esc((all.find(x => x.code === c.replacedBy) || {}).name || c.replacedBy) : '')}
   </dl>
   <p class="note">缺少的欄位（網站、LINE、統編、負責人）可到 GitHub 編輯 <code>data/dental-extra.csv</code> 補上，下次更新會自動合併。</p>`;
   $('#dMap').href = mapUrl(c);
@@ -551,7 +623,7 @@ $('#dAdd').addEventListener('click', async () => {
     if (list.some(x => x.code === c.code || (x.name === c.name && digits(x.phone) === digits(c.phone)))) { toast('「' + c.name + '」已在我的名單裡'); return; }
     const now = new Date().toISOString();
     list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: c.name, specs: ['牙科'], city: c.city || '', district: c.district || '',
-      address: c.address || '', phone: c.phone || '', mobile: '', doctor: c.owner || '', contact: '', email: c.email || '', website: c.website || '', code: c.code,
+      address: c.address || '', phone: c.phone || '', mobile: '', doctor: c.owner || (c.doctors || []).join('、'), contact: '', email: c.email || '', website: c.website || '', code: c.code,
       nhi: c.status === '健保特約' ? '是' : '否', hours: c.hoursNote || '', status: '潛在客戶', source: '全台牙醫診所資料庫', lastContact: '', nextFollow: '',
       tags: c.line ? ['LINE ' + c.line] : [], notes: [c.taxId ? '統編 ' + c.taxId : '', c.googleRating != null ? `Google ${c.googleRating}★ (${c.googleReviews})` : ''].filter(Boolean).join('；'),
       createdAt: now, updatedAt: now });
@@ -564,12 +636,12 @@ $('#dAdd').addEventListener('click', async () => {
 $('#exportBtn').addEventListener('click', () => {
   if (!view.length) return toast('目前沒有資料可匯出');
   // headers match clinics.html import so the file can be imported there directly
-  const H = ['診所名稱','科別','縣市','鄉鎮市區','地址','電話','負責醫師','Email','網站','醫事機構代碼','健保特約','門診時間','標籤','備註','統一編號','LINE','Facebook','Google評分','Google評論數','牙醫師人數','狀態說明'];
+  const H = ['診所名稱','科別','縣市','鄉鎮市區','地址','電話','負責醫師','Email','網站','醫事機構代碼','健保特約','門診時間','標籤','備註','統一編號','LINE','Facebook','Google評分','Google評論數','牙醫師人數','狀態說明','看診牙醫','機構類型','醫院層級','郵遞區號','村里','院長','傳真','專科與服務','醫師介紹連結'];
   const days = ['一','二','三','四','五','六','日'], parts = ['上午','下午','晚上'];
   const hrs = h => h ? days.map((d, i) => { const p = parts.filter((_, j) => h[i*3+j] === '1'); return p.length ? d + p.join('') : ''; }).filter(Boolean).join(' ') : '';
   const cell = v => { v = String(v ?? ''); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [H.join(',')].concat(view.map(c => [c.name, (c.specs || []).join('、'), c.city, c.district, c.address, c.phone, c.owner, c.email, c.website, c.code,
-    c.status === '健保特約' ? '是' : '否', hrs(c.hours), '', c.hoursNote, c.taxId, c.line, c.facebook, c.googleRating, c.googleReviews, c.dentists, c.status].map(cell).join(',')));
+    c.status === '健保特約' ? '是' : '否', hrs(c.hours), '', c.hoursNote, c.taxId, c.line, c.facebook, c.googleRating, c.googleReviews, c.dentists, c.status, (c.doctors || []).join('、'), c.category, c.hospitalLevel, c.zip, c.village, c.owner, c.fax, (c.specialties || []).join('、'), c.doctorPage].map(cell).join(',')));
   saveFile(`牙醫診所_${$('#fCity').value || '全台'}_${new Date().toISOString().slice(0, 10)}.csv`, '\uFEFF' + lines.join('\r\n'), `已匯出 ${fmt(view.length)} 筆`);
 });
 

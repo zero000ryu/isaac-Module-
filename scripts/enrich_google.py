@@ -14,7 +14,7 @@ DATA = os.path.join(ROOT, 'data')
 URL = 'https://places.googleapis.com/v1/places:searchText'
 FIELDS = ','.join('places.' + f for f in (
     'id', 'displayName', 'formattedAddress', 'nationalPhoneNumber', 'rating', 'userRatingCount',
-    'websiteUri', 'googleMapsUri', 'businessStatus'))
+    'websiteUri', 'googleMapsUri', 'businessStatus', 'regularOpeningHours'))
 
 
 def digits(s):
@@ -49,6 +49,24 @@ def pick(clinic, places):
     return None, None
 
 
+def opening_periods(h):
+    """Google regularOpeningHours -> [[day 0=Mon..6=Sun, 'HHMM', 'HHMM'], ...] plus the text Google shows."""
+    if not h:
+        return None
+    out = []
+    for p in h.get('periods') or []:
+        o, c = p.get('open') or {}, p.get('close') or {}
+        if 'day' not in o:
+            continue
+        day = (o['day'] + 6) % 7  # Google: 0 = Sunday
+        start = f"{o.get('hour', 0):02d}{o.get('minute', 0):02d}"
+        end = f"{c.get('hour', 23):02d}{c.get('minute', 59):02d}" if c else '2359'
+        if c and c.get('day') != o['day']:
+            end = '2359'  # runs past midnight
+        out.append([day, start, end])
+    return {'periods': out, 'text': h.get('weekdayDescriptions') or []}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=int(os.environ.get('GOOGLE_LIMIT', 30)))
@@ -80,7 +98,8 @@ def main():
             found += 1
             rec.update({'googlePlaceId': p.get('id'), 'googleRating': p.get('rating'), 'googleReviews': p.get('userRatingCount'),
                         'website': p.get('websiteUri'), 'googleUrl': p.get('googleMapsUri'),
-                        'businessStatus': p.get('businessStatus'), 'matchedBy': how})
+                        'businessStatus': p.get('businessStatus'), 'matchedBy': how,
+                        'hours': opening_periods(p.get('regularOpeningHours'))})
         g[c['code']] = {k: v for k, v in rec.items() if v not in (None, '')}
         done += 1
         time.sleep(0.1)

@@ -40,9 +40,23 @@ class ERP:
 
 
 def note_for(c):
-    parts = [f"醫事機構代碼 {c['code']}", c['status']]
+    parts = [f"醫事機構代碼 {c['code']}", c.get('category') or c['status']]
+    if c.get('hospitalLevel'):
+        parts.append(c['hospitalLevel'])
+    if c.get('zip'):
+        parts.append('郵遞區號 ' + c['zip'] + (('，' + c['village']) if c.get('village') else ''))
+    if c.get('owner'):
+        parts.append('院長 ' + c['owner'])
     if c.get('dentists'):
         parts.append(f"牙醫師 {c['dentists']} 位")
+    if c.get('doctors'):
+        parts.append('看診牙醫 ' + '、'.join(c['doctors']))
+    if c.get('otherPhones'):
+        parts.append('其他電話 ' + '、'.join(c['otherPhones']))
+    if c.get('regFee'):
+        parts.append('掛號費 ' + c['regFee'])
+    if c.get('checks'):
+        parts.append('需查證：' + '、'.join(c['checks']))
     if c.get('line'):
         parts.append(f"LINE {c['line']}")
     if c.get('googleRating') is not None:
@@ -65,7 +79,7 @@ def rows_for(clinics, scope):
     for c in pick:
         name = c['name'] if dup[c['name']] == 1 else f"{c['name']}（{c.get('city', '')}{c.get('district', '')}）"
         r = {'name': name, 'kind': 'clinic', 'phone': c.get('phone', ''), 'address': c.get('address', ''),
-             'tax_id': c.get('taxId', ''), 'contact': c.get('owner', ''), 'email': c.get('email', ''),
+             'tax_id': c.get('taxId', ''), 'contact': c.get('owner') or (c.get('doctors') or [''])[0], 'email': c.get('email', ''),
              'website': c.get('website', ''), 'note': note_for(c)}
         rows.append({k: v for k, v in r.items() if v not in ('', None)})
     return rows
