@@ -1,14 +1,14 @@
 {
  "summary": {
-  "openClinics": 7775,
+  "openClinics": 7776,
   "fieldCoverage": {
-   "phone": 7772,
-   "address": 7775,
-   "zip": 7775,
+   "phone": 7773,
+   "address": 7776,
+   "zip": 7776,
    "hours": 7351,
    "dentists": 7048,
-   "doctors": 5646,
-   "programs": 7185,
+   "doctors": 5649,
+   "programs": 7186,
    "regFee": 6739,
    "website": 0,
    "line": 0,
@@ -20,23 +20,23 @@
   "phoneConflicts": 590,
   "nameDiffs": 93,
   "addressDiffs": 279,
-  "relocations": 118,
-  "sharedAddress": 441,
-  "namedDentists": 13132,
-  "dentistsAtSeveralClinics": 1355,
-  "clinicsWithDoctors": 5646,
+  "relocations": 120,
+  "sharedAddress": 439,
+  "namedDentists": 13134,
+  "dentistsAtSeveralClinics": 1359,
+  "clinicsWithDoctors": 5649,
   "avgCompleteness": 53,
   "hoursCompared": 0,
   "hoursDiffer": 0,
-  "withZip": 7775,
+  "withZip": 7776,
   "withVillage": 1783,
   "tdaMatched": 1345,
   "ownersResolved": 815,
   "byCategory": {
-   "健保特約診所": 6998,
+   "健保特約診所": 6999,
    "自費診所": 587,
    "醫院牙科": 190,
-   "已歇業／終止": 280
+   "已歇業／終止": 281
   }
  },
  "issues": [
