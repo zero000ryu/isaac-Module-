@@ -5,7 +5,7 @@
    "phone": 7773,
    "address": 7776,
    "zip": 7776,
-   "hours": 7351,
+   "hours": 7352,
    "dentists": 7048,
    "doctors": 5649,
    "programs": 7186,
@@ -18,8 +18,8 @@
    "googleRating": 0
   },
   "phoneConflicts": 590,
-  "nameDiffs": 93,
-  "addressDiffs": 279,
+  "nameDiffs": 94,
+  "addressDiffs": 280,
   "relocations": 120,
   "sharedAddress": 439,
   "namedDentists": 13134,
@@ -2522,6 +2522,15 @@
    "values": [
     "06-7213888",
     "06-7221333"
+   ]
+  },
+  {
+   "code": "3705060021",
+   "name": "康宸美學牙醫診所",
+   "type": "地址不一致",
+   "values": [
+    "臺南市新化區協興里忠孝路162號1樓",
+    "臺南市新化區太平里中正路506號2樓"
    ]
   },
   {
@@ -5348,6 +5357,15 @@
    "values": [
     "(04)7119900",
     "22036565"
+   ]
+  },
+  {
+   "code": "3731063794",
+   "name": "新莊德威牙醫診所",
+   "type": "名稱不一致",
+   "values": [
+    "輔園牙醫診所",
+    "新莊德威牙醫診所"
    ]
   },
   {
