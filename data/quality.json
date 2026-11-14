@@ -1,14 +1,14 @@
 {
  "summary": {
-  "openClinics": 7776,
+  "openClinics": 7778,
   "fieldCoverage": {
-   "phone": 7773,
-   "address": 7776,
-   "zip": 7776,
-   "hours": 7352,
+   "phone": 7775,
+   "address": 7778,
+   "zip": 7778,
+   "hours": 7353,
    "dentists": 7048,
-   "doctors": 5649,
-   "programs": 7186,
+   "doctors": 5651,
+   "programs": 7188,
    "regFee": 6739,
    "website": 0,
    "line": 0,
@@ -19,22 +19,22 @@
   },
   "phoneConflicts": 590,
   "nameDiffs": 94,
-  "addressDiffs": 280,
+  "addressDiffs": 281,
   "relocations": 120,
-  "sharedAddress": 439,
-  "namedDentists": 13134,
+  "sharedAddress": 441,
+  "namedDentists": 13136,
   "dentistsAtSeveralClinics": 1359,
-  "clinicsWithDoctors": 5649,
+  "clinicsWithDoctors": 5651,
   "avgCompleteness": 53,
   "hoursCompared": 0,
   "hoursDiffer": 0,
-  "withZip": 7776,
+  "withZip": 7778,
   "withVillage": 1783,
   "tdaMatched": 1345,
   "ownersResolved": 815,
   "byCategory": {
-   "健保特約診所": 6999,
-   "自費診所": 587,
+   "健保特約診所": 7000,
+   "自費診所": 588,
    "醫院牙科": 190,
    "已歇業／終止": 281
   }
@@ -7778,6 +7778,15 @@
    "values": [
     "05-5338229",
     "05-5372028"
+   ]
+  },
+  {
+   "code": "3739021190",
+   "name": "晶采牙醫診所",
+   "type": "地址不一致",
+   "values": [
+    "雲林縣斗南鎮南昌里中山路62號",
+    "雲林縣斗南鎮南昌里順安街1號1、2樓"
    ]
   },
   {
