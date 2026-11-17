@@ -5,9 +5,9 @@
    "phone": 7775,
    "address": 7778,
    "zip": 7778,
-   "hours": 7353,
+   "hours": 7355,
    "dentists": 7048,
-   "doctors": 5651,
+   "doctors": 5649,
    "programs": 7188,
    "regFee": 6739,
    "website": 0,
@@ -17,14 +17,14 @@
    "owner": 815,
    "googleRating": 0
   },
-  "phoneConflicts": 590,
+  "phoneConflicts": 591,
   "nameDiffs": 94,
   "addressDiffs": 281,
   "relocations": 120,
   "sharedAddress": 441,
-  "namedDentists": 13136,
+  "namedDentists": 13134,
   "dentistsAtSeveralClinics": 1359,
-  "clinicsWithDoctors": 5651,
+  "clinicsWithDoctors": 5649,
   "avgCompleteness": 53,
   "hoursCompared": 0,
   "hoursDiffer": 0,
@@ -7463,6 +7463,15 @@
    "values": [
     "04-8355000",
     "04-835500"
+   ]
+  },
+  {
+   "code": "3737051887",
+   "name": "崇新牙醫診所",
+   "type": "電話不一致",
+   "values": [
+    "04-8390128",
+    "(04)8380123"
    ]
   },
   {
