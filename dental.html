@@ -178,6 +178,7 @@ footer.src{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.7}
 <header class="top">
   <div class="brand"><h1>全台牙醫診所</h1><p id="updated">載入資料中…</p></div>
   <div class="actions">
+    <a class="btn" href="floorplan.html" aria-label="平面設計工具" title="平面設計工具"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 12h8v9M11 3v5"/></svg><span class="lbl">平面設計</span></a>
     <a class="btn" href="clinics.html" aria-label="我的診所名單" title="我的診所名單"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="lbl">我的診所名單</span></a>
     <button class="btn" id="erpBtn" type="button" aria-label="ERP 串接" title="ERP 串接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span class="lbl">ERP 串接</span></button>
     <button class="btn" id="exportBtn" type="button" aria-label="匯出篩選結果 CSV" title="匯出篩選結果 CSV"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg><span class="lbl">匯出篩選結果 CSV</span></button>
@@ -664,7 +665,7 @@ async function saveFile(name, text, okMsg) {
 const erp = $('#erpDlg');
 $('#erpBtn').addEventListener('click', () => {
   // the ERP needs a public, daily-updated address: use GitHub Pages unless this page is already served from there
-  const base = /github\.io$|^localhost$|^127\./.test(location.hostname) ? location.href : 'https://zero000ryu.github.io/isaac-Module-/dental.html';
+  const base = /top-geng\.com$|github\.io$|^localhost$|^127\./.test(location.hostname) ? location.href : 'https://dental.top-geng.com/';
   const csv = new URL('data/dental.csv', base).href, json = new URL('data/dental.json', base).href;
   $('#feedCsv').textContent = csv; $('#feedJson').textContent = json; $('#feedCsvA').href = csv;
   erp.showModal();
