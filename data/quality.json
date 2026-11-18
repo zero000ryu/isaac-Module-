@@ -1,14 +1,14 @@
 {
  "summary": {
-  "openClinics": 7778,
+  "openClinics": 7779,
   "fieldCoverage": {
-   "phone": 7775,
-   "address": 7778,
-   "zip": 7778,
+   "phone": 7776,
+   "address": 7779,
+   "zip": 7779,
    "hours": 7355,
    "dentists": 7048,
-   "doctors": 5649,
-   "programs": 7188,
+   "doctors": 5650,
+   "programs": 7189,
    "regFee": 6739,
    "website": 0,
    "line": 0,
@@ -18,22 +18,22 @@
    "googleRating": 0
   },
   "phoneConflicts": 591,
-  "nameDiffs": 94,
+  "nameDiffs": 95,
   "addressDiffs": 281,
   "relocations": 120,
   "sharedAddress": 441,
   "namedDentists": 13134,
-  "dentistsAtSeveralClinics": 1359,
-  "clinicsWithDoctors": 5649,
+  "dentistsAtSeveralClinics": 1360,
+  "clinicsWithDoctors": 5650,
   "avgCompleteness": 53,
   "hoursCompared": 0,
   "hoursDiffer": 0,
-  "withZip": 7778,
-  "withVillage": 1783,
+  "withZip": 7779,
+  "withVillage": 1784,
   "tdaMatched": 1345,
   "ownersResolved": 815,
   "byCategory": {
-   "健保特約診所": 7000,
+   "健保特約診所": 7001,
    "自費診所": 588,
    "醫院牙科": 190,
    "已歇業／終止": 281
@@ -6464,6 +6464,15 @@
    "values": [
     "桃園市平鎮區南豐路78、80號1樓",
     "桃園市平鎮區福壽路82號1樓及夾層"
+   ]
+  },
+  {
+   "code": "3732101828",
+   "name": "英格蘭牙醫診所",
+   "type": "名稱不一致",
+   "values": [
+    "光采牙醫診所",
+    "英格蘭牙醫診所"
    ]
   },
   {
