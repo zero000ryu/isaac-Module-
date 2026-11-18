@@ -28,9 +28,13 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site/data
-          cp index.html clinics.html dental.html _site/
+          # dental.top-geng.com opens the dental database; the floor plan tool lives at /floorplan.html
+          cp dental.html _site/index.html
+          cp dental.html clinics.html _site/
+          cp index.html _site/floorplan.html
           cp -r plans _site/
           cp data/dental.json data/dental.csv _site/data/
+          echo "dental.top-geng.com" > _site/CNAME
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
