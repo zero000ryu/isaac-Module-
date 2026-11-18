@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
@@ -22,18 +21,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main   # when called after the data update, deploy the freshly committed data
-      - name: Prepare site
+      - name: Prepare site (redirect only; the database now lives in the ERP behind login)
         run: |
-          mkdir -p _site/data
-          # dental.top-geng.com opens the dental database; the floor plan tool lives at /floorplan.html
-          cp dental.html _site/index.html
-          cp dental.html clinics.html _site/
-          cp index.html _site/floorplan.html
-          cp -r plans _site/
-          cp data/dental.json data/dental.csv _site/data/
+          mkdir -p _site
+          for f in index.html 404.html; do cat > _site/$f <<'HTML'
+          <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+          <meta name="robots" content="noindex,nofollow">
+          <meta http-equiv="refresh" content="0; url=https://erp.top-geng.com/dental/">
+          <title>牙醫資料庫已移到 ERP</title></head>
+          <body><p>牙醫資料庫已移到 ERP，請登入使用：<a href="https://erp.top-geng.com/dental/">https://erp.top-geng.com/dental/</a></p></body></html>
+          HTML
+          done
           echo "dental.top-geng.com" > _site/CNAME
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5

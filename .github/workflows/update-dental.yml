@@ -12,8 +12,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: update-dental
@@ -22,8 +20,6 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.commit.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,14 +77,14 @@ jobs:
           git push origin HEAD:main
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
+      - name: Upload the database to the ERP, readable only after ERP login (needs DENTAL_DATA_TOKEN secret)
+        env:
+          DENTAL_DATA_TOKEN: ${{ secrets.DENTAL_DATA_TOKEN }}
+          ERP_URL: ${{ vars.ERP_URL || 'https://erp.top-geng.com' }}
+        run: python scripts/upload_erp_data.py --name clinics --file data/dental.json
       - name: Send new clinics to the ERP (only if ERP_EMAIL / ERP_PASSWORD secrets are set)
         env:
           ERP_EMAIL: ${{ secrets.ERP_EMAIL }}
           ERP_PASSWORD: ${{ secrets.ERP_PASSWORD }}
           ERP_SCOPE: ${{ vars.ERP_SCOPE || 'open' }}
         run: python scripts/sync_erp.py
-
-  deploy:
-    needs: update
-    if: needs.update.outputs.changed == 'true'
-    uses: ./.github/workflows/pages.yml
