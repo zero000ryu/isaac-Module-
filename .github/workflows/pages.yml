@@ -21,18 +21,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Prepare site (redirect only; the database now lives in the ERP behind login)
+      - name: Prepare site (redirect only; the database lives at dental.top-geng.com behind ERP login, hosted on Vercel)
         run: |
           mkdir -p _site
           for f in index.html 404.html; do cat > _site/$f <<'HTML'
           <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
           <meta name="robots" content="noindex,nofollow">
-          <meta http-equiv="refresh" content="0; url=https://erp.top-geng.com/dental/">
+          <meta http-equiv="refresh" content="0; url=https://dental.top-geng.com/">
           <title>牙醫資料庫已移到 ERP</title></head>
-          <body><p>牙醫資料庫已移到 ERP，請登入使用：<a href="https://erp.top-geng.com/dental/">https://erp.top-geng.com/dental/</a></p></body></html>
+          <body><p>牙醫資料庫已移到 ERP，請登入使用：<a href="https://dental.top-geng.com/">https://dental.top-geng.com/</a></p></body></html>
           HTML
           done
-          echo "dental.top-geng.com" > _site/CNAME
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
