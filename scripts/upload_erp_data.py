@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload a dataset to the ERP (erp.top-geng.com /api/dental) so it is only readable after ERP login.
+"""Upload a dataset to the ERP (erp.top-geng.com /api/lookup) so it is only readable after ERP login.
 
   python scripts/upload_erp_data.py --name clinics --file data/dental.json
 
@@ -15,7 +15,7 @@ PART_CHARS = 1_000_000
 def post(base, token, body, tries=4):
     data = json.dumps(body, ensure_ascii=False).encode()
     for i in range(tries):
-        req = urllib.request.Request(base.rstrip('/') + '/api/dental', data=data, method='POST', headers={
+        req = urllib.request.Request(base.rstrip('/') + '/api/lookup', data=data, method='POST', headers={
             'Content-Type': 'application/json', 'Authorization': f'Bearer {token}', 'User-Agent': 'dental-data-uploader/1.0'})
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
