@@ -3,7 +3,7 @@
 在瀏覽器裡畫室內平面圖、出工程圖、看 3D 效果圖的單檔網站。用瀏覽器打開 `index.html` 就能用，不需要安裝。
 
 ## 線上使用
-- **GitHub Pages**：把這個分支合併到 `main`，再到 GitHub 的 **Settings → Pages → Source** 選 **GitHub Actions**，網站就會自動發布到 **https://dental.top-geng.com/**（首頁是全台牙醫診所資料庫，平面設計工具在 `/floorplan.html`）。私人 repo 要有 GitHub Pro 或團隊方案才能使用 Pages；不然就把 repo 改成公開。
+- **GitHub Pages**：把這個分支合併到 `main`，再到 GitHub 的 **Settings → Pages → Source** 選 **GitHub Actions**，牙醫資料庫已改到 ERP 裡、**登入後才能使用**：https://erp.top-geng.com/dental/ 。`dental.top-geng.com`（GitHub Pages）只剩一個轉址頁，導到 ERP。私人 repo 要有 GitHub Pro 或團隊方案才能使用 Pages；不然就把 repo 改成公開。
 - **其他免費空間**：`index.html` 是單一檔案，直接上傳到 Netlify Drop、Cloudflare Pages 或 Vercel 也可以使用。
 
 ## 功能
@@ -40,7 +40,7 @@
 - 可以調整牆高剖切，並擷取效果圖
 
 ## 診所名單系統（`clinics.html`）
-從上方「診所名單」按鈕進入，或直接打開 `clinics.html`（網址：`https://dental.top-geng.com/clinics.html`）。
+從上方「診所名單」按鈕進入，或直接打開 `clinics.html`（ERP 內：`https://erp.top-geng.com/dental/clinics.html`）。
 - 新增、編輯、刪除診所：名稱、科別（可複選）、縣市／區、地址、電話、負責醫師、聯絡人、Email、醫事機構代碼、健保特約、門診時間、標籤、備註
 - 狀態分為潛在客戶、洽談中、合作中、暫停，可記錄上次聯絡與下次追蹤日期；逾期或 7 天內要追蹤的會標色提醒
 - 關鍵字搜尋（電話可只打部分數字），依縣市、科別、狀態篩選，點欄位標題排序；新增時會提醒可能重複的診所
@@ -49,7 +49,7 @@
 - 資料存在這台裝置的瀏覽器裡（IndexedDB），換電腦前請先匯出 JSON 備份
 
 ## 全台牙醫診所資料庫（`dental.html`）
-網址：**https://dental.top-geng.com/**（也可用 `/dental.html`）
+網址：**https://erp.top-geng.com/dental/**（ERP 登入後使用；每日排程以 `scripts/upload_erp_data.py` 和 secret `DENTAL_DATA_TOKEN` 把資料送進 ERP）
 
 **儀表板**：營業中、健保特約、自費診所數，執業牙醫師人數；各縣市長條圖（點一下就篩選），以及各鄉鎮市區排名。
 **搜尋**：名稱、地址、電話、機構代碼、負責人、LINE；可依縣市／區、狀態、有網站／LINE／Google 評分／統編、晚上或週末看診篩選，依 Google 評分、評論數、牙醫師人數排序。點診所可看詳細資料與看診時段，並可「加入我的診所名單」。

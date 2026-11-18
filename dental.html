@@ -305,7 +305,10 @@ const lineUrl = l => !l ? '' : /^https?:/.test(l) ? l : 'https://line.me/R/ti/p/
 const ymd = s => s && s.length === 8 ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slice(6)}` : '';
 
 /* ---------- load ---------- */
-fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
+// inside the ERP the data comes from the login-protected API (window.loadDataset, see /dental/loader.js)
+const IN_ERP = typeof window.loadDataset === 'function';
+(IN_ERP ? window.loadDataset('clinics', m => { $('#loading').textContent = m; })
+        : fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })).then(d => {
   meta = d.meta; all = d.clinics;
   for (const c of all) c._hay = [c.name, c.address, c.city, c.district, c.code, c.taxId, c.owner, (c.doctors || []).join(' '), (c.aliases || []).join(' '), (c.specialties || []).join(' '), c.zip, c.village, c.hospitalLevel, c.category, (c.programs || []).join(' '), c.line, c.website, c.email, (c.specs||[]).join(' ')].join(' ').toLowerCase().replace(/台/g, '臺');
   init();
@@ -315,6 +318,11 @@ fetch('data/dental.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw ne
 
 function init() {
   $('#loading').hidden = true; $('#app').hidden = false;
+  if (IN_ERP) {
+    // in the ERP: no public feed dialog or floor plan link; offer the ERP and the internal dentist lookup instead
+    $('#erpBtn').outerHTML = '<a class="btn" href="/" title="回到 ERP">回到 ERP</a> <a class="btn" href="doctors.html" title="內部牙醫師查詢">內部牙醫師查詢</a>';
+    const fp = document.querySelector('a[href="floorplan.html"]'); if (fp) fp.remove();
+  }
   const t = new Date(meta.generatedAt);
   $('#updated').textContent = `資料更新：${isNaN(t) ? meta.generatedAt : t.toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })} · 每日自動更新`;
   const cities = CITIES.filter(c => all.some(x => x.city === c));
@@ -663,7 +671,7 @@ async function saveFile(name, text, okMsg) {
 
 /* ---------- ERP feed ---------- */
 const erp = $('#erpDlg');
-$('#erpBtn').addEventListener('click', () => {
+$('#erpBtn') && $('#erpBtn').addEventListener('click', () => {
   // the ERP needs a public, daily-updated address: use GitHub Pages unless this page is already served from there
   const base = /top-geng\.com$|github\.io$|^localhost$|^127\./.test(location.hostname) ? location.href : 'https://dental.top-geng.com/';
   const csv = new URL('data/dental.csv', base).href, json = new URL('data/dental.json', base).href;
