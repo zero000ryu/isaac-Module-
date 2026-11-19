@@ -106,6 +106,12 @@ details.panel>summary{cursor:pointer;font-weight:700}
 .erp .result{font-size:13px;display:flex;flex-direction:column;gap:4px}
 .erp .result .err{color:var(--warn)}
 a.pill{text-decoration:none}
+.pick{display:flex;flex-direction:column;gap:8px}
+.small-link{font-size:13px;color:var(--accent);align-self:center}
+.pick .list{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pick label.row{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
+.pick label.row:last-child{border-bottom:none}
+.pick label.row span.m{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
 .help li{margin:2px 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -135,6 +141,10 @@ a.pill{text-decoration:none}
         <small>舊版 Word（.doc）請先在 Word 另存成 .docx</small>
       </div>
       <input id="file" type="file" multiple accept=".docx,.doc,.xlsx,.xlsm,.xls,.csv" hidden>
+      <div id="pick" class="pick" hidden>
+        <div class="btns"><button id="pickOpen" class="small">從檔案網站選擇出貨單</button><a class="small-link" href="/tools/files.html">開啟檔案網站</a></div>
+        <div id="pickBox" hidden></div>
+      </div>
       <div id="log" class="log"></div>
     </div>
     <div class="panel settings">
@@ -153,6 +163,10 @@ a.pill{text-decoration:none}
       <div class="btns">
         <button id="dlAll" class="primary">下載彙整 Excel</button>
         <button id="dlZip">每張應收單各一檔（ZIP）</button>
+      </div>
+      <div class="btns" id="fsSave" hidden>
+        <button id="fsAll" class="small">彙整 Excel 存到檔案網站</button>
+        <button id="fsEach" class="small">每張應收單存到檔案網站</button>
       </div>
       <div class="btns">
         <button id="addOrder" class="small">手動新增出貨單</button>
@@ -554,7 +568,7 @@ async function handleFiles(files) {
   if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; openGroups.clear(); openOrders.clear(); }
   let added = 0;
   for (const f of files) {
-    const src = f.name + "|" + f.size + "|" + f.lastModified;
+    const src = f.fsId ? "fs|" + f.fsId : f.name + "|" + f.size + "|" + f.lastModified;
     const ext = (f.name.split(".").pop() || "").toLowerCase();
     if (state.seen.includes(src)) { log.push({ msg: `${f.name}：已經讀過，略過` }); continue; }
     try {
@@ -673,7 +687,7 @@ function renderAR(groups) {
     html += `<tr class="cust"><td colspan="5">${esc(c)}</td><td class="r num">${fmt(ct)}</td><td></td></tr>`;
     gs.forEach(g => {
       const open = openGroups.has(g.key);
-      html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span>${g.bad ? ` <span class="pill warn">${g.bad} 項金額有誤</span>` : ""}</td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td><button class="small" data-dl="${esc(g.key)}">下載</button></td></tr>`;
+      html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span>${g.bad ? ` <span class="pill warn">${g.bad} 項金額有誤</span>` : ""}</td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td style="white-space:nowrap"><button class="small" data-dl="${esc(g.key)}">下載</button>${ERP_MODE && erp.user && erpCan("files.write") ? ` <button class="small" data-fs="${esc(g.key)}">存檔</button>` : ""}</td></tr>`;
       if (open) {
         html += `<tr class="sub"><td colspan="7"><div class="inner"><table><thead><tr><th>日期</th><th>單號</th><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th></tr></thead><tbody>` +
           g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(specOf(it))}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num${amtWrong(it) ? " bad" : ""}"${amtWrong(it) ? ` title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${fmt(it.amount)}${amtWrong(it) ? ` <span class="pill warn">應為 ${fmt(expectedAmt(it))}</span>` : ""}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
@@ -839,13 +853,16 @@ function rangeLabel(groups) {
   const f = v => `${Math.floor(v / 100)}${pad(v % 100)}`;
   return a === b ? f(a) : `${f(a)}-${f(b)}`;
 }
-async function downloadAll() {
-  const groups = buildGroups(); if (!groups.length) return;
+function allWorkbook() {
+  const groups = buildGroups(); if (!groups.length) return null;
   const wb = XLSX.utils.book_new(); const used = new Set(["應收總表", "出貨明細"]);
   XLSX.utils.book_append_sheet(wb, summarySheet(groups), "應收總表");
   XLSX.utils.book_append_sheet(wb, detailSheet(groups), "出貨明細");
   groups.forEach(g => XLSX.utils.book_append_sheet(wb, groupSheet(g), sheetName(g.name, used)));
-  await saveFile(`應收帳款彙整_${rangeLabel(groups)}.xlsx`, wbBytes(wb));
+  return { name: `應收帳款彙整_${rangeLabel(groups)}.xlsx`, blob: wbBytes(wb) };
+}
+async function downloadAll() {
+  const f = allWorkbook(); if (f) await saveFile(f.name, f.blob);
 }
 async function downloadZip() {
   const groups = buildGroups(); if (!groups.length) return;
@@ -891,6 +908,7 @@ $("#amtAlert").addEventListener("click", e => {
 });
 $("#onlyWarn").addEventListener("change", () => { renderOrders(); lockImported(); });
 $("#arBody").addEventListener("click", e => {
+  if (e.target.closest("[data-fs]")) return;
   const b = e.target.closest("[data-dl]"); if (b) { e.stopPropagation(); downloadGroup(b.dataset.dl); return; }
   const tr = e.target.closest("tr.grp"); if (!tr) return;
   const k = tr.dataset.g; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); render();
@@ -941,7 +959,8 @@ const erpCan = p => erp.perms.includes("*") || erp.perms.includes(p);
 const erpKey = s => norm(s).replace(/[\s()\[\]【】\-_/、,，。:：]+/g, "").toLowerCase();
 async function erpApi(path, opts = {}) {
   const res = await fetch(path, { credentials: "same-origin", method: opts.method || "GET",
-    headers: opts.body ? { "Content-Type": "application/json" } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    headers: opts.raw ? { "Content-Type": "application/octet-stream" } : opts.body ? { "Content-Type": "application/json" } : {},
+    body: opts.raw || (opts.body ? JSON.stringify(opts.body) : undefined) });
   let data = {}; try { data = await res.json(); } catch (e) {}
   if (!res.ok) { const err = new Error(data.error || `ERP 回應錯誤（${res.status}）`); err.status = res.status; throw err; }
   return data;
@@ -953,7 +972,10 @@ async function erpInit() {
     if (erp.user) erp.customers = await erpApi("/api/records?type=customers");
   } catch (e) { erp.error = e.message; }
   erp.ready = true;
-  renderErp();
+  render();
+  // 從檔案網站按「用出貨單彙整開啟」過來：/tools/shipping.html?files=1,2,3
+  const ids = (new URLSearchParams(location.search).get("files") || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (erp.user && ids.length) { history.replaceState(null, "", location.pathname); await loadFromFileSite(ids); }
 }
 // 出貨單上的客戶名稱 → ERP 客戶：完全相同（忽略空白、括號）自動對上；只有一個名稱互相包含的當作建議，要人確認
 function erpAutoMatch(name) {
@@ -980,6 +1002,7 @@ function erpProblems(o) {
 function erpReady() { return state.example ? [] : state.orders.filter(o => !o.erp && !erpProblems(o).length); }
 function renderErp() {
   if (!ERP_MODE) return;
+  renderPick();
   $("#erpPanel").hidden = false;
   $("#privacy").textContent = "檔案在瀏覽器裡讀取，按「匯入 ERP」才會送進 ERP";
   const u = $("#erpUser"); u.hidden = false;
@@ -1069,6 +1092,91 @@ $("#erpBody").addEventListener("click", e => {
     save(); renderErp();
   }
 });
+
+/* ---------- 檔案網站（ERP 的 /tools/files.html）：讀出貨單、存回應收 Excel ---------- */
+const FILES_API = "/api/lookup?route=files";
+const PICK_RE = /\.(docx|xlsx|xlsm|xls|csv)$/i;
+const pick = { open: false, loading: false, files: [], folder: "*", sel: new Set(), error: "" };
+function renderPick() {
+  if (!ERP_MODE) return;
+  $("#pick").hidden = !erp.user;
+  $("#fsSave").hidden = !(erp.user && erpCan("files.write"));
+  const box = $("#pickBox"); box.hidden = !pick.open;
+  $("#pickOpen").textContent = pick.open ? "收起檔案網站清單" : "從檔案網站選擇出貨單";
+  if (!pick.open) return;
+  if (pick.loading) { box.innerHTML = `<p class="help">讀取檔案清單…</p>`; return; }
+  if (pick.error) { box.innerHTML = `<p class="help">${esc(pick.error)}</p>`; return; }
+  const folders = [...new Set(pick.files.map(f => f.folder))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  const list = pick.files.filter(f => pick.folder === "*" || f.folder === pick.folder);
+  const seen = new Set(state.seen.map(s => s.split("|")[0] === "fs" ? s : "").filter(Boolean));
+  box.innerHTML = `<div class="btns"><select id="pickFolder" aria-label="資料夾"><option value="*">全部資料夾</option>${folders.map(f => `<option value="${esc(f)}">${esc(f || "未分類")}</option>`).join("")}</select></div>` +
+    (list.length ? `<div class="list">${list.map(f => `<label class="row"><input type="checkbox" data-pick="${f.id}" ${pick.sel.has(f.id) ? "checked" : ""}>${esc(f.name)}${seen.has("fs|" + f.id) ? ` <span class="pill ok">已讀取</span>` : ""}<span class="m">${esc(f.folder || "未分類")} · ${new Date(f.created_at).toLocaleDateString("zh-TW")}</span></label>`).join("")}</div>`
+      : `<p class="help">檔案網站裡沒有 Word 或 Excel 檔。<a href="/tools/files.html">先去上傳</a></p>`) +
+    `<div class="btns"><button id="pickGo" class="primary small" ${pick.sel.size ? "" : "disabled"}>讀取選取的 ${pick.sel.size} 個檔案</button></div>`;
+  $("#pickFolder").value = pick.folder;
+}
+async function pickLoad() {
+  pick.loading = true; pick.error = ""; renderPick();
+  try {
+    pick.files = (await erpApi(FILES_API)).files.filter(f => PICK_RE.test(f.name));
+    // 有「出貨單」資料夾時預設只列那裡，免得選到存回去的應收 Excel
+    if (pick.folder === "*" && pick.files.some(f => f.folder === "出貨單")) pick.folder = "出貨單";
+  }
+  catch (e) { pick.error = e.message; }
+  pick.loading = false; renderPick();
+}
+async function loadFromFileSite(ids) {
+  const files = [], errs = [];
+  for (const id of ids) {
+    try {
+      const res = await fetch(`${FILES_API}&id=${id}`, { credentials: "same-origin" });
+      if (!res.ok) { let m = ""; try { m = (await res.json()).error; } catch (e) {} throw new Error(m || `讀取失敗（${res.status}）`); }
+      const cd = res.headers.get("content-disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+      const name = m ? decodeURIComponent(m[1]) : `檔案${id}.xlsx`;
+      // lastModified 用檔案編號，讓「已讀過」判斷認得同一個檔案網站檔案
+      const f = new File([await res.blob()], name, { lastModified: id });
+      f.fsId = id; files.push(f);
+    } catch (e) { errs.push(`檔案 #${id}：${e.message}`); }
+  }
+  if (files.length) await handleFiles(files);
+  if (errs.length) $("#log").innerHTML += errs.map(e => `<div class="err">${esc(e)}</div>`).join("");
+}
+async function saveToFileSite(name, blob, folder = "應收帳款") {
+  const r = await erpApi(`${FILES_API}&folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`, { method: "POST", raw: blob });
+  return r;
+}
+$("#pickOpen").addEventListener("click", () => { pick.open = !pick.open; if (pick.open && !pick.files.length) pickLoad(); else renderPick(); });
+$("#pickBox").addEventListener("change", e => {
+  if (e.target.id === "pickFolder") { pick.folder = e.target.value; renderPick(); return; }
+  const c = e.target.closest("[data-pick]"); if (!c) return;
+  const id = +c.dataset.pick; c.checked ? pick.sel.add(id) : pick.sel.delete(id); renderPick();
+});
+$("#pickBox").addEventListener("click", async e => {
+  if (!e.target.closest("#pickGo")) return;
+  const ids = [...pick.sel]; pick.sel.clear(); pick.open = false; renderPick();
+  await loadFromFileSite(ids);
+});
+$("#fsAll").addEventListener("click", async () => {
+  const f = allWorkbook(); if (!f) { toast("還沒有應收帳款可以存"); return; }
+  try { const r = await saveToFileSite(f.name, f.blob); toast(r.duplicate ? "檔案網站已經有一模一樣的檔案" : `已存到檔案網站「應收帳款」：${f.name}`); }
+  catch (e) { toast("存檔失敗：" + e.message); }
+});
+$("#fsEach").addEventListener("click", async () => {
+  const groups = buildGroups(); if (!groups.length) { toast("還沒有應收帳款可以存"); return; }
+  let n = 0, dup = 0;
+  try {
+    for (const g of groups) { const r = await saveToFileSite(safeFile(g.name) + ".xlsx", wbBytes(groupWorkbook([g]))); r.duplicate ? dup++ : n++; }
+    toast(`已存 ${n} 張應收單到檔案網站「應收帳款」` + (dup ? `，${dup} 張已經存過` : ""));
+  } catch (e) { toast(`存到第 ${n + dup + 1} 張時失敗：${e.message}`); }
+});
+$("#arBody").addEventListener("click", async e => {
+  const b = e.target.closest("[data-fs]"); if (!b) return;
+  e.stopPropagation();
+  const g = buildGroups().find(x => x.key === b.dataset.fs); if (!g) return;
+  try { const r = await saveToFileSite(safeFile(g.name) + ".xlsx", wbBytes(groupWorkbook([g]))); toast(r.duplicate ? "檔案網站已經有一模一樣的檔案" : `已存到檔案網站「應收帳款」：${g.name}`); }
+  catch (err) { toast("存檔失敗：" + err.message); }
+}, true);
 
 /* ---------- example data ---------- */
 function exampleOrders() {
