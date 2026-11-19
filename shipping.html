@@ -97,6 +97,15 @@ details.panel>summary{cursor:pointer;font-weight:700}
 .src{font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;max-width:calc(100% - 32px);z-index:20}
 .help{font-size:13px;color:var(--muted)}
+.topright{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.erpuser{font-size:12px;color:var(--muted)}
+.erpuser a,.erp a{color:var(--accent)}
+.erp{display:flex;flex-direction:column;gap:12px}
+.erp .tablebox table{min-width:520px}
+.erp select{max-width:340px}
+.erp .result{font-size:13px;display:flex;flex-direction:column;gap:4px}
+.erp .result .err{color:var(--warn)}
+a.pill{text-decoration:none}
 .help li{margin:2px 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -107,7 +116,10 @@ details.panel>summary{cursor:pointer;font-weight:700}
       <h1>出貨應收彙整</h1>
       <p class="sub">上傳 Word、Excel 出貨單，依客戶、帳款月份整理成「XX牙醫-X月份應收款」Excel。</p>
     </div>
-    <span class="privacy">檔案只在你的瀏覽器裡處理，不會上傳到任何伺服器</span>
+    <div class="topright">
+      <span class="privacy" id="privacy">檔案只在你的瀏覽器裡處理，不會上傳到任何伺服器</span>
+      <span id="erpUser" class="erpuser" hidden></span>
+    </div>
   </header>
 
   <div id="exampleBanner" class="banner" hidden>
@@ -166,6 +178,14 @@ details.panel>summary{cursor:pointer;font-weight:700}
       </table>
     </div>
     <p class="help">點一列可以看到這個月的出貨單（依日期排序）。</p>
+  </section>
+
+  <section class="panel" id="erpPanel" hidden>
+    <div class="sechead">
+      <h2>匯入 ERP</h2>
+      <div id="erpStats" class="stats"></div>
+    </div>
+    <div id="erpBody"></div>
   </section>
 
   <details class="panel" id="aliasBox">
@@ -382,8 +402,7 @@ function parseItems(rows, start, cols) {
     if (amount == null && qty != null && price != null) amount = Math.round(qty * price * 100) / 100;
     if (price == null && amount != null && qty) price = Math.round(amount / qty * 100) / 100;
     const notes = [get(row, "note"), get(row, "lot") && "批號 " + get(row, "lot"), get(row, "exp") && "效期 " + get(row, "exp")].filter(Boolean).join("；");
-    const spec = [get(row, "code"), get(row, "spec")].filter(Boolean).join(" ");
-    const it = { name, spec, qty, unit, price, amount, note: notes };
+    const it = { code: get(row, "code"), name, spec: get(row, "spec"), qty, unit, price, amount, note: notes };
     if (cols.customer != null) it._c = cleanCustomer(get(row, "customer"));
     if (cols.date != null) it._d = parseDate(get(row, "date"));
     if (cols.no != null) it._n = get(row, "no");
@@ -556,6 +575,7 @@ async function handleFiles(files) {
 }
 
 /* ---------- receivables ---------- */
+const specOf = it => [it.code, it.spec].filter(Boolean).join(" ");
 function orderTotal(o) { return o.items.reduce((s, it) => s + (Number(it.amount) || 0), 0); }
 /* 數量 × 單價 和金額相差超過 1 元（容許四捨五入）就算錯 */
 function expectedAmt(it) {
@@ -630,6 +650,8 @@ function render() {
   renderAR(groups);
   renderAliases();
   renderOrders();
+  lockImported();
+  renderErp();
   const has = groups.length > 0;
   $("#dlAll").disabled = !has; $("#dlZip").disabled = !has;
   const nbI = state.orders.reduce((s, o) => s + badItems(o), 0), nbO = state.orders.filter(o => badItems(o)).length;
@@ -654,7 +676,7 @@ function renderAR(groups) {
       html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span>${g.bad ? ` <span class="pill warn">${g.bad} 項金額有誤</span>` : ""}</td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td><button class="small" data-dl="${esc(g.key)}">下載</button></td></tr>`;
       if (open) {
         html += `<tr class="sub"><td colspan="7"><div class="inner"><table><thead><tr><th>日期</th><th>單號</th><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th></tr></thead><tbody>` +
-          g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(it.spec)}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num${amtWrong(it) ? " bad" : ""}"${amtWrong(it) ? ` title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${fmt(it.amount)}${amtWrong(it) ? ` <span class="pill warn">應為 ${fmt(expectedAmt(it))}</span>` : ""}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
+          g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(specOf(it))}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num${amtWrong(it) ? " bad" : ""}"${amtWrong(it) ? ` title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${fmt(it.amount)}${amtWrong(it) ? ` <span class="pill warn">應為 ${fmt(expectedAmt(it))}</span>` : ""}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
           `</tbody></table></div></td></tr>`;
       }
     });
@@ -675,18 +697,18 @@ function renderOrders() {
   const nWarn = state.orders.filter(o => warnings(o).length).length;
   $("#ordStats").innerHTML = `<span>共 <b class="num">${state.orders.length}</b> 張</span>` + (nWarn ? `<span class="pill warn">${nWarn} 張需確認</span>` : state.orders.length ? `<span class="pill ok">全部讀取完整</span>` : "");
   if (only) list = list.filter(o => warnings(o).length);
-  if (q) list = list.filter(o => squash([o.customer, o.no, o.file, o.date, ...o.items.map(i => i.name + i.spec)].join(" ")).toLowerCase().includes(q));
+  if (q) list = list.filter(o => squash([o.customer, o.no, o.file, o.date, ...o.items.map(i => i.name + specOf(i))].join(" ")).toLowerCase().includes(q));
   const body = $("#ordBody");
   if (!list.length) { body.innerHTML = `<tr><td colspan="8" class="empty">${state.orders.length ? "沒有符合條件的出貨單。" : "還沒有出貨單。"}</td></tr>`; return; }
   body.innerHTML = list.map(o => {
     const w = warnings(o); const open = openOrders.has(o.id);
-    let h = `<tr data-o="${o.id}">
+    let h = `<tr data-o="${o.id}"${o.erp ? ' class="locked"' : ""}>
       <td style="min-width:170px"><input type="text" id="c-${o.id}" data-f="customer" value="${esc(o.customer)}" list="custList" placeholder="輸入客戶名稱" aria-label="客戶"></td>
       <td style="min-width:140px"><input type="date" id="d-${o.id}" data-f="date" value="${esc(o.date)}" aria-label="出貨日期"></td>
       <td style="min-width:110px"><input type="text" id="n-${o.id}" data-f="no" value="${esc(o.no)}" aria-label="單號"></td>
       <td class="r num">${o.items.length}</td>
       <td class="r num">${fmt(orderTotal(o))}</td>
-      <td><div class="pills">${state.example ? `<span class="pill ex">範例</span>` : ""}${w.length ? w.map(x => `<span class="pill warn">${esc(x)}</span>`).join("") : `<span class="pill ok">完整</span>`}</div></td>
+      <td><div class="pills">${state.example ? `<span class="pill ex">範例</span>` : ""}${o.erp ? `<a class="pill ok" href="/#/orders/${o.erp.id}" title="已匯入 ERP">ERP ${esc(o.erp.order_no)}</a>` : ""}${o.erpError ? `<span class="pill warn" title="${esc(o.erpError)}">ERP 匯入失敗</span>` : ""}${w.length ? w.map(x => `<span class="pill warn">${esc(x)}</span>`).join("") : `<span class="pill ok">完整</span>`}</div></td>
       <td><div class="src" title="${esc(o.file)}">${esc(o.file)}</div></td>
       <td style="white-space:nowrap"><button class="link" data-act="toggle">${open ? "收合" : "品項"}</button><button class="link danger" data-act="del">刪除</button></td></tr>`;
     if (open) {
@@ -704,6 +726,11 @@ function renderOrders() {
     }
     return h;
   }).join("");
+}
+
+function lockImported() {
+  state.orders.filter(o => o.erp).forEach(o => document.querySelectorAll(`#ordBody tr[data-o="${o.id}"]`).forEach(tr =>
+    tr.querySelectorAll("input, [data-act=addItem], [data-act=delItem], [data-act=fixAmt]").forEach(el => { el.disabled = true; el.title = "已匯入 ERP，這裡修改不會改到 ERP"; })));
 }
 
 /* ---------- excel export ---------- */
@@ -736,7 +763,7 @@ function groupSheet(g) {
   const first = rows.length + 1;
   g.orders.forEach(o => {
     if (!o.items.length) rows.push([dcell(o.date), o.no, "（沒有品項）"]);
-    o.items.forEach(it => rows.push([dcell(o.date), o.no, it.name, it.spec, it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note]));
+    o.items.forEach(it => rows.push([dcell(o.date), o.no, it.name, specOf(it), it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note]));
   });
   const last = rows.length;
   rows.push([]);
@@ -781,7 +808,7 @@ function detailSheet(groups) {
   const rows = [["客戶", "帳款月份", "日期", "出貨單號", "品名", "規格", "數量", "單位", "單價", "金額", "備註", "來源檔案", "檢查"]];
   groups.forEach(g => g.orders.forEach(o => {
     if (!o.items.length) rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, "（沒有品項）", "", "", "", "", "", "", o.file]);
-    o.items.forEach(it => rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, it.name, it.spec, it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note, o.file, amtWrong(it) ? `金額不符：數量×單價＝${fmt(expectedAmt(it))}` : ""]));
+    o.items.forEach(it => rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, it.name, specOf(it), it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note, o.file, amtWrong(it) ? `金額不符：數量×單價＝${fmt(expectedAmt(it))}` : ""]));
   }));
   const ws = sheetFromRows(rows);
   ws["!cols"] = [{ wch: 18 }, { wch: 9 }, { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 7 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
@@ -855,14 +882,14 @@ $("#addOrder").addEventListener("click", () => {
   state.orders.push(o); openOrders.add(o.id); $("#onlyWarn").checked = false; $("#q").value = ""; save(); render();
   setTimeout(() => { const el = document.getElementById("c-" + o.id); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } }, 30);
 });
-$("#q").addEventListener("input", renderOrders);
+$("#q").addEventListener("input", () => { renderOrders(); lockImported(); });
 $("#amtAlert").addEventListener("click", e => {
   if (!e.target.closest("#showBad")) return;
   state.orders.forEach(o => { if (badItems(o)) openOrders.add(o.id); });
-  $("#onlyWarn").checked = true; $("#q").value = ""; renderOrders();
+  $("#onlyWarn").checked = true; $("#q").value = ""; renderOrders(); lockImported();
   $("#ordBody").scrollIntoView({ block: "start", behavior: "smooth" });
 });
-$("#onlyWarn").addEventListener("change", renderOrders);
+$("#onlyWarn").addEventListener("change", () => { renderOrders(); lockImported(); });
 $("#arBody").addEventListener("click", e => {
   const b = e.target.closest("[data-dl]"); if (b) { e.stopPropagation(); downloadGroup(b.dataset.dl); return; }
   const tr = e.target.closest("tr.grp"); if (!tr) return;
@@ -895,7 +922,7 @@ ordBody.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const o = findOrder(b); if (!o) return;
   const act = b.dataset.act;
-  if (act === "toggle") { openOrders.has(o.id) ? openOrders.delete(o.id) : openOrders.add(o.id); renderOrders(); return; }
+  if (act === "toggle") { openOrders.has(o.id) ? openOrders.delete(o.id) : openOrders.add(o.id); renderOrders(); lockImported(); return; }
   if (act === "del") {
     if (b.dataset.sure) { state.orders = state.orders.filter(x => x !== o); save(); render(); toast("已刪除出貨單"); }
     else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
@@ -905,6 +932,142 @@ ordBody.addEventListener("click", e => {
   if (act === "addItem") { o.items.push({ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }); o.stated = null; }
   if (act === "delItem") { o.items.splice(+b.closest("tr[data-i]").dataset.i, 1); o.stated = null; }
   save(); render();
+});
+
+/* ---------- ERP（頁面放在牙材 ERP 網站裡、有 <meta name="erp"> 時才啟用） ---------- */
+const ERP_MODE = !!document.querySelector('meta[name="erp"]');
+const erp = { ready: false, user: null, perms: [], customers: [], busy: false, result: null, error: "" };
+const erpCan = p => erp.perms.includes("*") || erp.perms.includes(p);
+const erpKey = s => norm(s).replace(/[\s()\[\]【】\-_/、,，。:：]+/g, "").toLowerCase();
+async function erpApi(path, opts = {}) {
+  const res = await fetch(path, { credentials: "same-origin", method: opts.method || "GET",
+    headers: opts.body ? { "Content-Type": "application/json" } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  let data = {}; try { data = await res.json(); } catch (e) {}
+  if (!res.ok) { const err = new Error(data.error || `ERP 回應錯誤（${res.status}）`); err.status = res.status; throw err; }
+  return data;
+}
+async function erpInit() {
+  try {
+    const me = await erpApi("/api/auth");
+    erp.user = me.user; erp.perms = me.perms || [];
+    if (erp.user) erp.customers = await erpApi("/api/records?type=customers");
+  } catch (e) { erp.error = e.message; }
+  erp.ready = true;
+  renderErp();
+}
+// 出貨單上的客戶名稱 → ERP 客戶：完全相同（忽略空白、括號）自動對上；只有一個名稱互相包含的當作建議，要人確認
+function erpAutoMatch(name) {
+  const k = erpKey(name);
+  const exact = erp.customers.find(c => erpKey(c.name) === k);
+  if (exact) return { value: "id:" + exact.id, how: "auto" };
+  const near = k.length >= 2 ? erp.customers.filter(c => { const ck = erpKey(c.name); return ck.length >= 2 && (ck.includes(k) || k.includes(ck)); }) : [];
+  if (near.length === 1) return { value: "id:" + near[0].id, how: "suggest" };
+  return { value: "", how: "none" };
+}
+function erpMapping(name) {
+  const saved = (state.erpMap || {})[name];
+  if (saved === "new" || (saved && erp.customers.some(c => "id:" + c.id === saved))) return { value: saved, how: "manual" };
+  return erpAutoMatch(name);
+}
+function erpProblems(o) {
+  const p = warnings(o).slice();
+  o.items.forEach(it => {
+    if (!(Number(it.qty) > 0)) p.push(`「${it.name || "品項"}」數量要大於 0`);
+    else if (it.price == null || it.price === "") p.push(`「${it.name || "品項"}」缺單價`);
+  });
+  return [...new Set(p)];
+}
+function erpReady() { return state.example ? [] : state.orders.filter(o => !o.erp && !erpProblems(o).length); }
+function renderErp() {
+  if (!ERP_MODE) return;
+  $("#erpPanel").hidden = false;
+  $("#privacy").textContent = "檔案在瀏覽器裡讀取，按「匯入 ERP」才會送進 ERP";
+  const u = $("#erpUser"); u.hidden = false;
+  u.innerHTML = erp.user ? `牙材 ERP · ${esc(erp.user.name || erp.user.email)}　<a href="/#/dashboard">回 ERP</a>` : `<a href="/#/login">登入牙材 ERP</a>`;
+  const body = $("#erpBody");
+  if (!erp.ready) { body.innerHTML = `<p class="help">正在連線 ERP…</p>`; $("#erpStats").innerHTML = ""; return; }
+  if (!erp.user) { body.innerHTML = `<div class="alert"><span>${erp.error ? esc(erp.error) + "。" : ""}還沒登入 ERP。請先<a href="/#/login">登入</a>，再回到這一頁重新整理。</span></div>`; return; }
+  if (!["orders.write", "shipments.write", "products.write"].every(erpCan)) { body.innerHTML = `<p class="help">你的角色不能匯入出貨單（需要訂貨單、出貨和產品的權限），請管理者協助。</p>`; return; }
+  const ready = erpReady();
+  const done = state.orders.filter(o => o.erp).length;
+  const blocked = state.example ? 0 : state.orders.filter(o => !o.erp && erpProblems(o).length).length;
+  $("#erpStats").innerHTML = `<span>可以匯入 <b class="num">${ready.length}</b> 張</span>` + (blocked ? `<span class="pill warn">${blocked} 張需確認，不會匯入</span>` : "") + (done ? `<span class="pill ok">已匯入 ${done} 張</span>` : "");
+  const names = [...new Set(ready.map(o => o.customer))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  const canNew = erpCan("customers.write");
+  const custOpts = erp.customers.slice().sort((a, b) => a.name.localeCompare(b.name, "zh-Hant")).map(c => `<option value="id:${c.id}">${esc(c.name)}</option>`).join("");
+  const unmapped = names.filter(n => !erpMapping(n).value);
+  let html = `<div class="erp">
+    <p class="help">每張出貨單會在 ERP 建成一張「已出貨」的訂單：日期用出貨日期、扣庫存，ERP 找不到的產品會自動新增到產品主檔（庫存從 0 起算）。
+    匯入後在 ERP 的應收帳款、月對帳單和收款沖銷都看得到。同一張出貨單（同客戶、同單號）不會重複匯入。
+    ${state.settings.tax ? "營業稅設定為外加 5%，訂單會標記「開發票」並加 5% 稅額。" : "營業稅設定為不計，訂單不加稅額；要開發票請把上方營業稅改成外加 5%。"}</p>`;
+  if (state.example) html += `<p class="help">目前是範例資料，不會匯入。請上傳你的出貨單。</p>`;
+  if (names.length) {
+    html += `<div class="tablebox"><table><thead><tr><th>出貨單上的客戶</th><th>對應 ERP 客戶</th><th></th></tr></thead><tbody>` +
+      names.map((n, i) => {
+        const m = erpMapping(n);
+        const pill = m.how === "auto" ? `<span class="pill ok">已自動對應</span>` : m.how === "suggest" ? `<span class="pill warn">名稱相近，請確認</span>` : m.value ? "" : `<span class="pill warn">請選擇</span>`;
+        return `<tr><td>${esc(n)}</td><td><select id="erpmap-${i}" data-erpmap="${esc(n)}" aria-label="${esc(n)} 對應的 ERP 客戶">
+          <option value="">請選擇客戶…</option>${canNew ? `<option value="new">＋ 新增客戶「${esc(n)}」</option>` : ""}${custOpts}</select></td><td>${pill}</td></tr>`;
+      }).join("") + `</tbody></table></div>`;
+    if (unmapped.length && canNew) html += `<div class="btns"><button class="small" id="erpAllNew">${unmapped.length} 個未對應的都新增為新客戶</button></div>`;
+  }
+  html += `<div class="btns"><button class="primary" id="erpGo" ${!ready.length || unmapped.length || erp.busy ? "disabled" : ""}>${erp.busy ? "匯入中…" : `匯入 ${ready.length} 張到 ERP`}</button></div>`;
+  if (unmapped.length) html += `<p class="help">還有 ${unmapped.length} 個客戶沒有選對應，選好才能匯入。</p>`;
+  if (erp.result) html += `<div class="result">${erp.result}</div>`;
+  html += `</div>`;
+  body.innerHTML = html;
+  body.querySelectorAll("[data-erpmap]").forEach(sel => { sel.value = erpMapping(sel.dataset.erpmap).value; });
+}
+async function erpImport() {
+  const ready = erpReady();
+  if (!ready.length || erp.busy) return;
+  erp.busy = true; erp.result = ""; renderErp();
+  const created = [], dups = [], errors = [];
+  const tax = state.settings.tax > 0;
+  try {
+    for (let i = 0; i < ready.length; i += 20) {
+      const chunk = ready.slice(i, i + 20);
+      const payload = chunk.map(o => {
+        const m = erpMapping(o.customer).value;
+        return {
+          ref: o.no || "", date: o.date, need_invoice: tax, file: o.file,
+          ...(m === "new" ? { new_customer: o.customer } : { customer_id: Number(m.slice(3)) }),
+          items: o.items.map(it => ({ code: it.code || "", name: it.name, spec: it.spec || "", unit: it.unit || "", qty: it.qty, unit_price: it.price, amount: it.amount })),
+        };
+      });
+      erp.result = `正在匯入 ${Math.min(i + chunk.length, ready.length)}／${ready.length} 張…`; renderErp();
+      const r = await erpApi("/api/orders", { method: "POST", body: { action: "import_shipped", deduct_stock: true, orders: payload } });
+      r.results.forEach(x => {
+        const o = chunk[x.index];
+        if (x.status === "error") { o.erpError = x.message; errors.push(`${o.customer} ${o.date} ${o.no}：${x.message.replace(/^[^：]*：/, "")}`); return; }
+        o.erp = { id: x.id, order_no: x.order_no }; delete o.erpError;
+        (x.status === "created" ? created : dups).push(o);
+        if (x.customer_id && erpMapping(o.customer).value === "new") { state.erpMap = state.erpMap || {}; state.erpMap[o.customer] = "id:" + x.customer_id; }
+      });
+      save();
+    }
+  } catch (e) {
+    errors.push(e.status === 401 ? "ERP 登入已過期，請重新登入後再按一次匯入（已匯入的不會重複）。" : e.message);
+  }
+  try { erp.customers = await erpApi("/api/records?type=customers"); } catch (e) {}
+  erp.busy = false;
+  erp.result = `<div><b>已建立 ${created.length} 張訂單</b>${dups.length ? `，${dups.length} 張之前已經匯入過` : ""}${errors.length ? `，<span class="err">${errors.length} 個問題</span>` : ""}。
+    <a href="/#/receivables">看應收帳款</a>　<a href="/#/statement">月對帳單</a>　<a href="/#/orders">訂貨單</a></div>` +
+    errors.map(e => `<div class="err">${esc(e)}</div>`).join("");
+  save(); render();
+  toast(`已匯入 ${created.length} 張到 ERP`);
+}
+$("#erpBody").addEventListener("change", e => {
+  const sel = e.target.closest("[data-erpmap]"); if (!sel) return;
+  state.erpMap = state.erpMap || {}; state.erpMap[sel.dataset.erpmap] = sel.value; save(); renderErp();
+});
+$("#erpBody").addEventListener("click", e => {
+  if (e.target.closest("#erpGo")) { erpImport(); return; }
+  if (e.target.closest("#erpAllNew")) {
+    state.erpMap = state.erpMap || {};
+    erpReady().forEach(o => { if (!erpMapping(o.customer).value) state.erpMap[o.customer] = "new"; });
+    save(); renderErp();
+  }
 });
 
 /* ---------- example data ---------- */
@@ -924,6 +1087,8 @@ function exampleOrders() {
   ];
 }
 load();
-if (!state.orders.length && !state.dismissedExample) { state.orders = exampleOrders(); state.example = true; }
+if (!ERP_MODE && !state.orders.length && !state.dismissedExample) { state.orders = exampleOrders(); state.example = true; }
+if (ERP_MODE && state.example) { state.orders = []; state.example = false; }
 render();
+if (ERP_MODE) erpInit();
 </script>

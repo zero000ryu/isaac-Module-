@@ -55,6 +55,7 @@
 - 同一客戶的出貨單依日期排序，再依帳款月份分成「XX牙醫-X月份應收款」；可設定每月結帳日（例如 25 日）和是否外加 5% 營業稅
 - 「客戶名稱整理」可以把同一家診所的不同寫法合併
 - 下載一個彙整 Excel（應收總表、出貨明細、每張應收單各一個工作表），或每張應收單各一個檔案（ZIP）
+- 放在牙材 ERP 裡（`scripts/build_erp_shipping.py` 產生 dental-erp 的 `tools/shipping.html`）時多一個「匯入 ERP」步驟，把出貨單建成 ERP 的已出貨訂單
 
 ## 全台牙醫診所資料庫（`dental.html`）
 網址：**https://dental.top-geng.com/**（登入後使用；每日排程以 `scripts/upload_erp_data.py` 和 secret `DENTAL_DATA_TOKEN` 把資料送進 ERP）
