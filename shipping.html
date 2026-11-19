@@ -77,6 +77,9 @@ tr.grp:hover td{background:var(--bg)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.ex{background:var(--example-soft);color:var(--example)}
+td.bad{color:var(--warn);font-weight:700}
+input.badin{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.alert{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
 .pills{display:flex;flex-wrap:wrap;gap:4px}
 tr.sub td{background:var(--bg);font-size:13px}
 .inner{padding:8px 4px 10px}
@@ -143,6 +146,7 @@ details.panel>summary{cursor:pointer;font-weight:700}
         <button id="addOrder" class="small">手動新增出貨單</button>
         <button id="clearAll" class="small danger">清除全部</button>
       </div>
+      <div id="amtAlert" class="alert" hidden></div>
       <div id="confirmClear" class="banner" hidden>
         <span>確定清除所有出貨單？</span>
         <span class="btns"><button id="clearYes" class="small danger">清除</button><button id="clearNo" class="small">取消</button></span>
@@ -196,6 +200,7 @@ details.panel>summary{cursor:pointer;font-weight:700}
       <li>品項：找含有「品名」和「數量」或「金額」的表頭列，往下讀到「合計、總計、以下空白」為止。沒有金額時用數量 × 單價計算。</li>
       <li>一個 Word 檔或一個 Excel 工作表裡有多張出貨單也可以，每出現一次表頭就算一張；Excel 若是一列一筆、有「客戶」「日期」欄的流水帳，也會自動拆開。</li>
       <li>帳款月份：結帳日設為月底時依出貨日期的月份；設為 25 日時，10/26～11/25 的出貨算 11 月份。</li>
+      <li>品項的金額和「數量×單價」相差超過 1 元時會標紅，並提示正確金額，可以一鍵改正；下載的「出貨明細」也會在「檢查」欄註明。</li>
       <li>讀不到或金額對不起來的出貨單會標「需確認」，可以直接在表格裡修改。</li>
     </ul>
   </details>
@@ -552,8 +557,22 @@ async function handleFiles(files) {
 
 /* ---------- receivables ---------- */
 function orderTotal(o) { return o.items.reduce((s, it) => s + (Number(it.amount) || 0), 0); }
+/* 數量 × 單價 和金額相差超過 1 元（容許四捨五入）就算錯 */
+function expectedAmt(it) {
+  const q = Number(it.qty), p = Number(it.price);
+  if (it.qty == null || it.qty === "" || it.price == null || it.price === "" || !isFinite(q) || !isFinite(p)) return null;
+  return Math.round(q * p * 100) / 100;
+}
+function amtWrong(it) {
+  const e = expectedAmt(it);
+  if (e == null || it.amount == null || it.amount === "") return false;
+  return Math.abs(e - Number(it.amount)) > 1;
+}
+const badItems = o => o.items.filter(amtWrong).length;
 function warnings(o) {
   const w = [];
+  const nb = badItems(o);
+  if (nb) w.push(`${nb} 項金額≠數量×單價`);
   if (!o.customer) w.push("缺客戶");
   if (!o.date) w.push("缺日期");
   if (!o.items.length) w.push("沒有品項");
@@ -594,6 +613,7 @@ function buildGroups() {
     g.sub = g.orders.reduce((s, o) => s + orderTotal(o), 0);
     g.tax = tax ? Math.round(g.sub * tax / 100) : 0;
     g.total = g.sub + g.tax;
+    g.bad = g.orders.reduce((s, o) => s + badItems(o), 0);
     g.name = `${g.customer}-${withYear ? g.y + "年" : ""}${g.m}月份應收款`;
     g.range = periodRange(g.y, g.m, cutoff);
   });
@@ -612,6 +632,9 @@ function render() {
   renderOrders();
   const has = groups.length > 0;
   $("#dlAll").disabled = !has; $("#dlZip").disabled = !has;
+  const nbI = state.orders.reduce((s, o) => s + badItems(o), 0), nbO = state.orders.filter(o => badItems(o)).length;
+  const al = $("#amtAlert"); al.hidden = !nbI;
+  if (nbI) al.innerHTML = `<span>有 <b>${nbI}</b> 個品項的金額不等於數量×單價（${nbO} 張出貨單）。下載前請先確認。</span><button class="small" id="showBad">查看</button>`;
 }
 function renderAR(groups) {
   const body = $("#arBody");
@@ -628,10 +651,10 @@ function renderAR(groups) {
     html += `<tr class="cust"><td colspan="5">${esc(c)}</td><td class="r num">${fmt(ct)}</td><td></td></tr>`;
     gs.forEach(g => {
       const open = openGroups.has(g.key);
-      html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span></td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td><button class="small" data-dl="${esc(g.key)}">下載</button></td></tr>`;
+      html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span>${g.bad ? ` <span class="pill warn">${g.bad} 項金額有誤</span>` : ""}</td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td><button class="small" data-dl="${esc(g.key)}">下載</button></td></tr>`;
       if (open) {
         html += `<tr class="sub"><td colspan="7"><div class="inner"><table><thead><tr><th>日期</th><th>單號</th><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th></tr></thead><tbody>` +
-          g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(it.spec)}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num">${fmt(it.amount)}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
+          g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(it.spec)}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num${amtWrong(it) ? " bad" : ""}"${amtWrong(it) ? ` title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${fmt(it.amount)}${amtWrong(it) ? ` <span class="pill warn">應為 ${fmt(expectedAmt(it))}</span>` : ""}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
           `</tbody></table></div></td></tr>`;
       }
     });
@@ -674,7 +697,7 @@ function renderOrders() {
           <td style="width:80px"><input type="number" id="i-${o.id}-${i}-qty" data-k="qty" value="${it.qty ?? ""}" step="any" class="num"></td>
           <td style="width:64px"><input type="text" id="i-${o.id}-${i}-unit" data-k="unit" value="${esc(it.unit)}"></td>
           <td style="width:100px"><input type="number" id="i-${o.id}-${i}-price" data-k="price" value="${it.price ?? ""}" step="any" class="num"></td>
-          <td style="width:110px"><input type="number" id="i-${o.id}-${i}-amount" data-k="amount" value="${it.amount ?? ""}" step="any" class="num"></td>
+          <td style="width:130px"><input type="number" id="i-${o.id}-${i}-amount" data-k="amount" value="${it.amount ?? ""}" step="any" class="num${amtWrong(it) ? " badin" : ""}"${amtWrong(it) ? ` aria-invalid="true" title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${amtWrong(it) ? `<button class="link" data-act="fixAmt">改成 ${fmt(expectedAmt(it))}</button>` : ""}</td>
           <td style="min-width:120px"><input type="text" id="i-${o.id}-${i}-note" data-k="note" value="${esc(it.note)}"></td>
           <td><button class="link danger" data-act="delItem" aria-label="刪除品項">×</button></td></tr>`).join("") +
         `</tbody></table><div class="btns" style="margin-top:6px"><button class="small" data-act="addItem">新增品項</button></div></div></td></tr>`;
@@ -739,12 +762,12 @@ function sheetName(name, used) {
 function summarySheet(groups) {
   const tax = state.settings.tax;
   const rows = [["應收帳款總表"], [`結帳日：${state.settings.cutoff ? "每月 " + state.settings.cutoff + " 日" : "月底"}　營業稅：${tax ? "外加 " + tax + "%" : "不計"}`], [],
-    ["客戶", "帳款月份", "應收單名稱", "計算期間", "出貨單數", "未稅金額", "營業稅", "應收金額"]];
+    ["客戶", "帳款月份", "應收單名稱", "計算期間", "出貨單數", "未稅金額", "營業稅", "應收金額", "金額有誤品項"]];
   const custs = [...new Set(groups.map(g => g.customer))];
   let gs = 0, gt = 0, gx = 0, gn = 0;
   custs.forEach(c => {
     const list = groups.filter(g => g.customer === c);
-    list.forEach(g => rows.push([g.customer, `${g.y}/${pad(g.m)}`, g.name, `${g.range[0]} ~ ${g.range[1]}`, g.orders.length, mcell(g.sub), mcell(g.tax), mcell(g.total)]));
+    list.forEach(g => rows.push([g.customer, `${g.y}/${pad(g.m)}`, g.name, `${g.range[0]} ~ ${g.range[1]}`, g.orders.length, mcell(g.sub), mcell(g.tax), mcell(g.total), g.bad || ""]));
     const s = list.reduce((a, g) => a + g.sub, 0), x = list.reduce((a, g) => a + g.tax, 0), t = list.reduce((a, g) => a + g.total, 0), n = list.reduce((a, g) => a + g.orders.length, 0);
     if (list.length > 1) rows.push([`${c} 小計`, "", "", "", n, mcell(s), mcell(x), mcell(t)]);
     gs += s; gx += x; gt += t; gn += n;
@@ -755,14 +778,14 @@ function summarySheet(groups) {
   return ws;
 }
 function detailSheet(groups) {
-  const rows = [["客戶", "帳款月份", "日期", "出貨單號", "品名", "規格", "數量", "單位", "單價", "金額", "備註", "來源檔案"]];
+  const rows = [["客戶", "帳款月份", "日期", "出貨單號", "品名", "規格", "數量", "單位", "單價", "金額", "備註", "來源檔案", "檢查"]];
   groups.forEach(g => g.orders.forEach(o => {
     if (!o.items.length) rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, "（沒有品項）", "", "", "", "", "", "", o.file]);
-    o.items.forEach(it => rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, it.name, it.spec, it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note, o.file]));
+    o.items.forEach(it => rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, it.name, it.spec, it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note, o.file, amtWrong(it) ? `金額不符：數量×單價＝${fmt(expectedAmt(it))}` : ""]));
   }));
   const ws = sheetFromRows(rows);
-  ws["!cols"] = [{ wch: 18 }, { wch: 9 }, { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 7 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 24 }];
-  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 11 } }) };
+  ws["!cols"] = [{ wch: 18 }, { wch: 9 }, { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 7 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 12 } }) };
   return ws;
 }
 function wbBytes(wb) { return new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array", compression: true })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }); }
@@ -833,6 +856,12 @@ $("#addOrder").addEventListener("click", () => {
   setTimeout(() => { const el = document.getElementById("c-" + o.id); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } }, 30);
 });
 $("#q").addEventListener("input", renderOrders);
+$("#amtAlert").addEventListener("click", e => {
+  if (!e.target.closest("#showBad")) return;
+  state.orders.forEach(o => { if (badItems(o)) openOrders.add(o.id); });
+  $("#onlyWarn").checked = true; $("#q").value = ""; renderOrders();
+  $("#ordBody").scrollIntoView({ block: "start", behavior: "smooth" });
+});
 $("#onlyWarn").addEventListener("change", renderOrders);
 $("#arBody").addEventListener("click", e => {
   const b = e.target.closest("[data-dl]"); if (b) { e.stopPropagation(); downloadGroup(b.dataset.dl); return; }
@@ -872,6 +901,7 @@ ordBody.addEventListener("click", e => {
     else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
     return;
   }
+  if (act === "fixAmt") { const it = o.items[+b.closest("tr[data-i]").dataset.i]; it.amount = expectedAmt(it); o.stated = null; save(); render(); toast("已改成數量×單價"); return; }
   if (act === "addItem") { o.items.push({ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }); o.stated = null; }
   if (act === "delItem") { o.items.splice(+b.closest("tr[data-i]").dataset.i, 1); o.stated = null; }
   save(); render();
