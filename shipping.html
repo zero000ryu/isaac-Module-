@@ -1005,7 +1005,7 @@ async function fillPhoto(img) {
 function photoPanel(o) {
   const d = o.doubts || [];
   return `<div class="slip"><img data-photo="${esc(o.photo)}" data-act="photoBig" alt="出貨單照片" title="點一下放大／縮小">
-    <div class="doubts">${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
+    <div class="doubts">${o.slipNote ? `<div><b>單上備註：</b>${esc(o.slipNote)}（匯入時寫進 ERP 訂單備註）</div>` : ""}${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
     ${o.erp ? "" : o.photoOk ? `<div><span class="pill ok">已核對照片</span></div>` : `<div class="btns"><button class="small primary" data-act="photoOk">已對照片核對，內容正確</button></div>`}</div></div>`;
 }
 // 縮小照片：長邊 max 像素、JPEG（iPhone HEIC 只有 Safari 讀得到）
@@ -1041,6 +1041,9 @@ async function readPhoto(file, src) {
   return slips.map((s, k) => {
     const doubts = [...(s.doubts || []), ...(k ? [] : r.problems || [])];
     if (s.tax_included && s.total != null) doubts.push(`單上合計 ${fmt(s.total)} 含稅，品項金額以未稅計`);
+    s.items.filter(it => it.erp_price).forEach(it => doubts.push(`「${it.name}」單上沒寫單價，先帶入 ERP 定價 ${fmt(it.price)}`));
+    const noPrice = s.items.filter(it => it.price == null && it.amount == null).length;
+    if (noPrice) doubts.push(`${noPrice} 個品項單上沒寫單價，請在下方填入後再匯入`);
     const items = s.items.map(it => {
       let price = it.price, amount = it.amount;
       if (price == null && amount != null && it.qty) price = r2(amount / it.qty);
@@ -1049,7 +1052,7 @@ async function readPhoto(file, src) {
         note: [it.note, it.written ? `單上寫「${it.written}」` : ""].filter(Boolean).join("；") };
     });
     const o = mkOrder({ file: file.name + (slips.length > 1 ? `（第 ${k + 1} 張）` : "") + "・照片", src }, cleanCustomer(s.customer), s.date, s.no, items, s.tax_included ? null : s.total, []);
-    o.photo = key; o.doubts = doubts.slice(0, 12); o.photoOk = false;
+    o.photo = key; o.doubts = doubts.slice(0, 14); o.photoOk = false; o.slipNote = s.note || "";
     openOrders.add(o.id);
     return o;
   });
@@ -1173,7 +1176,7 @@ async function erpImport() {
       const m = erpMapping(o.customer).value;
       const photo = o.photo ? await photoGet(o.photo) : "";
       const row = {
-        ref: o.no || "", date: o.date, need_invoice: tax, file: o.file,
+        ref: o.no || "", date: o.date, need_invoice: tax, file: o.file, ...(o.slipNote ? { note: o.slipNote } : {}),
         ...(m === "new" ? { new_customer: o.customer } : { customer_id: Number(m.slice(3)) }),
         ...(photo ? { photo } : {}),
         items: o.items.map(it => ({ code: it.code || "", name: it.name, spec: it.spec || "", unit: it.unit || "", qty: it.qty, unit_price: it.price, amount: it.amount })),
