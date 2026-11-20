@@ -107,6 +107,9 @@ details.panel>summary{cursor:pointer;font-weight:700}
 /* 手機上出貨單表格比螢幕寬：照片區固定在畫面寬度內，不會被切掉 */
 .slip{position:sticky;left:0;max-width:calc(100vw - 100px)}
 @media (max-width:640px){.slip img{width:100%;max-width:none;max-height:45vh;object-fit:contain}.slip img.big{max-height:none}.slip .doubts{min-width:0;flex-basis:100%}}
+.blocked{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:13px}
+.blocked ul{margin:6px 0 0;padding-left:18px}
+.blocked li{margin:3px 0}
 .slip .custedit{display:flex;gap:8px;align-items:center}
 .slip .custedit input{flex:1;min-width:0;font-size:16px}
 .slip .doubts ul{margin:0;padding-left:18px;color:var(--warn)}
@@ -269,7 +272,7 @@ a.pill{text-decoration:none}
 /* ---------- state ---------- */
 const STORE = "shipping-ar-v1";
 let state = { orders: [], settings: { cutoff: 0, tax: 0 }, example: false, seen: [] };
-const openGroups = new Set(), openOrders = new Set();
+const openGroups = new Set(), openOrders = new Set(), closedOrders = new Set();
 const $ = s => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const fmt = n => (n == null || isNaN(n)) ? "" : Math.round(n).toLocaleString("zh-TW");
@@ -742,7 +745,8 @@ function renderOrders() {
   const body = $("#ordBody");
   if (!list.length) { body.innerHTML = `<tr><td colspan="8" class="empty">${state.orders.length ? "沒有符合條件的出貨單。" : "還沒有出貨單。"}</td></tr>`; return; }
   body.innerHTML = list.map(o => {
-    const w = warnings(o); const open = openOrders.has(o.id);
+    // 照片匯入、還沒核對的單自動展開（手機上「品項」按鈕在表格最右邊，不好找）
+    const w = warnings(o); const open = openOrders.has(o.id) || (!!o.photo && !o.photoOk && !o.erp && !closedOrders.has(o.id));
     let h = `<tr data-o="${o.id}"${o.erp ? ' class="locked"' : ""}>
       <td style="min-width:170px"><input type="text" id="c-${o.id}" data-f="customer" value="${esc(o.customer)}" list="custList" placeholder="輸入客戶名稱" aria-label="客戶"></td>
       <td style="min-width:140px"><input type="date" id="d-${o.id}" data-f="date" value="${esc(o.date)}" aria-label="出貨日期"></td>
@@ -968,7 +972,11 @@ ordBody.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const o = findOrder(b); if (!o) return;
   const act = b.dataset.act;
-  if (act === "toggle") { openOrders.has(o.id) ? openOrders.delete(o.id) : openOrders.add(o.id); renderOrders(); lockImported(); return; }
+  if (act === "toggle") {
+    const wasOpen = !!b.closest("tr").nextElementSibling?.classList.contains("sub");
+    if (wasOpen) { openOrders.delete(o.id); closedOrders.add(o.id); } else { openOrders.add(o.id); closedOrders.delete(o.id); }
+    renderOrders(); lockImported(); return;
+  }
   if (act === "del") {
     if (b.dataset.sure) { state.orders = state.orders.filter(x => x !== o); dropUnusedPhotos(); save(); render(); toast("已刪除出貨單"); }
     else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
@@ -1171,6 +1179,14 @@ function renderErp() {
       }).join("") + `</tbody></table></div>`;
     if (unmapped.length && canNew) html += `<div class="btns"><button class="small" id="erpAllNew">${unmapped.length} 個未對應的都新增為新客戶</button></div>`;
   }
+  // 還不能匯入的單：列出原因，點「前往」跳到那張單（手機上不用左右滑找）
+  const blockedList = state.example ? [] : state.orders.filter(o => !o.erp && erpProblems(o).length);
+  const unchecked = blockedList.filter(o => o.photo && !o.photoOk);
+  if (blockedList.length) {
+    html += `<div class="blocked"><b>還不能匯入的出貨單</b>` +
+      (unchecked.length ? `<div class="btns"><button class="small primary" id="erpAllOk">我已對照片核對全部 ${unchecked.length} 張</button></div>` : "") +
+      `<ul>${blockedList.map(o => `<li>${esc(o.customer || "（沒有客戶）")} ${esc(o.no)}：${esc(erpProblems(o).join("、"))} <button class="link" data-goto="${o.id}">前往</button></li>`).join("")}</ul></div>`;
+  }
   html += `<div class="btns"><button class="primary" id="erpGo" ${!ready.length || unmapped.length || erp.busy ? "disabled" : ""}>${erp.busy ? "匯入中…" : `匯入 ${ready.length} 張到 ERP`}</button></div>`;
   if (unmapped.length) html += `<p class="help">還有 ${unmapped.length} 個客戶沒有選對應，選好才能匯入。</p>`;
   if (erp.result) html += `<div class="result">${erp.result}</div>`;
@@ -1233,6 +1249,18 @@ $("#erpBody").addEventListener("change", e => {
 });
 $("#erpBody").addEventListener("click", e => {
   if (e.target.closest("#erpGo")) { erpImport(); return; }
+  if (e.target.closest("#erpAllOk")) {
+    let n = 0; state.orders.forEach(o => { if (o.photo && !o.photoOk && !o.erp) { o.photoOk = true; n++; } });
+    save(); render(); toast(`已核對 ${n} 張照片`); return;
+  }
+  const go = e.target.closest("[data-goto]");
+  if (go) {
+    const id = go.dataset.goto; openOrders.add(id); closedOrders.delete(id);
+    $("#q").value = ""; $("#onlyWarn").checked = false; renderOrders(); lockImported();
+    const row = document.querySelector(`#ordBody tr[data-o="${id}"]`);
+    if (row) { row.scrollIntoView({ block: "start", behavior: "smooth" }); row.closest(".tablebox")?.scrollTo({ left: 0 }); }
+    return;
+  }
   if (e.target.closest("#erpAllNew")) {
     state.erpMap = state.erpMap || {};
     erpReady().forEach(o => { if (!erpMapping(o.customer).value) state.erpMap[o.customer] = "new"; });
