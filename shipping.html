@@ -97,6 +97,13 @@ details.panel>summary{cursor:pointer;font-weight:700}
 .src{font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;max-width:calc(100% - 32px);z-index:20}
 .help{font-size:13px;color:var(--muted)}
+.photo{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.photo strong{font-size:14px}
+.slip{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+.slip img{width:220px;max-width:100%;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--bg)}
+.slip img.big{width:100%;max-width:900px;cursor:zoom-out}
+.slip .doubts{flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.slip .doubts ul{margin:0;padding-left:18px;color:var(--warn)}
 .topright{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .erpuser{font-size:12px;color:var(--muted)}
 .erpuser a,.erp a{color:var(--accent)}
@@ -137,10 +144,17 @@ a.pill{text-decoration:none}
     <div class="panel" style="display:flex;flex-direction:column;gap:10px">
       <div id="drop" class="drop" tabindex="0" role="button" aria-label="選擇出貨單檔案">
         <strong>把出貨單拖到這裡，或點一下選擇檔案</strong>
-        <small>支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案</small>
+        <small id="dropTypes">支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案</small>
         <small>舊版 Word（.doc）請先在 Word 另存成 .docx</small>
       </div>
       <input id="file" type="file" multiple accept=".docx,.doc,.xlsx,.xlsm,.xls,.csv" hidden>
+      <div id="photoBox" class="photo" hidden>
+        <strong>拍出貨單照片匯入</strong>
+        <div class="btns"><button id="photoCam" class="primary">📷 拍照</button><button id="photoPick">選擇照片</button></div>
+        <small class="help">AI 讀出客戶、日期、單號和品項（約 10～30 秒一張），核對照片後按下方「匯入 ERP」，就會建立已出貨的訂單和出貨單，照片存在出貨紀錄裡。</small>
+        <input id="photoCamIn" type="file" accept="image/*" capture="environment" hidden>
+        <input id="photoIn" type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple hidden>
+      </div>
       <div id="pick" class="pick" hidden>
         <div class="btns"><button id="pickOpen" class="small">從檔案網站選擇出貨單</button><a class="small-link" href="/tools/files.html">開啟檔案網站</a></div>
         <div id="pickBox" hidden></div>
@@ -573,7 +587,10 @@ async function handleFiles(files) {
     if (state.seen.includes(src)) { log.push({ msg: `${f.name}：已經讀過，略過` }); continue; }
     try {
       let orders;
-      if (ext === "docx") orders = await readDocx(f, src);
+      if (IMG_RE.test(f.name) || /^image\//.test(f.type || "")) {
+        $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("") + `<div>${esc(f.name)}：AI 辨識中…</div>`;
+        orders = await readPhoto(f, src);
+      } else if (ext === "docx") orders = await readDocx(f, src);
       else if (["xlsx", "xlsm", "xls", "csv"].includes(ext)) orders = await readExcel(f, src);
       else if (ext === "doc") throw new Error("舊版 .doc 無法讀取，請在 Word 另存成 .docx");
       else throw new Error("不支援這種檔案");
@@ -610,6 +627,7 @@ function warnings(o) {
   if (!o.customer) w.push("缺客戶");
   if (!o.date) w.push("缺日期");
   if (!o.items.length) w.push("沒有品項");
+  if (o.photo && !o.photoOk) w.push("照片待核對");
   if (o.items.some(it => it.amount == null || it.amount === "")) w.push("品項缺金額");
   if (o.stated && o.items.length && Math.abs(o.stated - orderTotal(o)) > 1) w.push(`合計不符（單上 ${fmt(o.stated)}）`);
   (o.notes || []).forEach(n => { if (!w.includes(n) && !(n === "找不到品項表格" && w.includes("沒有品項"))) w.push(n); });
@@ -726,7 +744,7 @@ function renderOrders() {
       <td><div class="src" title="${esc(o.file)}">${esc(o.file)}</div></td>
       <td style="white-space:nowrap"><button class="link" data-act="toggle">${open ? "收合" : "品項"}</button><button class="link danger" data-act="del">刪除</button></td></tr>`;
     if (open) {
-      h += `<tr class="sub" data-o="${o.id}"><td colspan="8"><div class="inner"><table><thead><tr><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th><th>備註</th><th></th></tr></thead><tbody>` +
+      h += `<tr class="sub" data-o="${o.id}"><td colspan="8"><div class="inner">${o.photo ? photoPanel(o) : ""}<table><thead><tr><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th><th>備註</th><th></th></tr></thead><tbody>` +
         o.items.map((it, i) => `<tr data-i="${i}">
           <td style="min-width:180px"><input type="text" id="i-${o.id}-${i}-name" data-k="name" value="${esc(it.name)}"></td>
           <td style="min-width:110px"><input type="text" id="i-${o.id}-${i}-spec" data-k="spec" value="${esc(it.spec)}"></td>
@@ -740,6 +758,7 @@ function renderOrders() {
     }
     return h;
   }).join("");
+  body.querySelectorAll("img[data-photo]").forEach(fillPhoto);
 }
 
 function lockImported() {
@@ -892,7 +911,7 @@ $("#dlZip").addEventListener("click", downloadZip);
 $("#clearExample").addEventListener("click", () => { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; save(); render(); });
 $("#clearAll").addEventListener("click", () => { $("#confirmClear").hidden = false; });
 $("#clearNo").addEventListener("click", () => { $("#confirmClear").hidden = true; });
-$("#clearYes").addEventListener("click", () => { state.orders = []; state.seen = []; state.example = false; state.dismissedExample = true; $("#confirmClear").hidden = true; $("#log").innerHTML = ""; save(); render(); toast("已清除"); });
+$("#clearYes").addEventListener("click", () => { photoClear(); state.orders = []; state.seen = []; state.example = false; state.dismissedExample = true; $("#confirmClear").hidden = true; $("#log").innerHTML = ""; save(); render(); toast("已清除"); });
 $("#addOrder").addEventListener("click", () => {
   if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; }
   const o = { id: uid(), file: "手動新增", src: "", customer: "", date: new Date().toISOString().slice(0, 10), no: "", items: [{ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }], stated: null, notes: [] };
@@ -942,15 +961,100 @@ ordBody.addEventListener("click", e => {
   const act = b.dataset.act;
   if (act === "toggle") { openOrders.has(o.id) ? openOrders.delete(o.id) : openOrders.add(o.id); renderOrders(); lockImported(); return; }
   if (act === "del") {
-    if (b.dataset.sure) { state.orders = state.orders.filter(x => x !== o); save(); render(); toast("已刪除出貨單"); }
+    if (b.dataset.sure) { state.orders = state.orders.filter(x => x !== o); dropUnusedPhotos(); save(); render(); toast("已刪除出貨單"); }
     else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
     return;
   }
+  if (act === "photoOk") { o.photoOk = true; save(); render(); toast("已核對"); return; }
+  if (act === "photoBig") { b.classList.toggle("big"); return; }
   if (act === "fixAmt") { const it = o.items[+b.closest("tr[data-i]").dataset.i]; it.amount = expectedAmt(it); o.stated = null; save(); render(); toast("已改成數量×單價"); return; }
   if (act === "addItem") { o.items.push({ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }); o.stated = null; }
   if (act === "delItem") { o.items.splice(+b.closest("tr[data-i]").dataset.i, 1); o.stated = null; }
   save(); render();
 });
+
+/* ---------- 出貨單照片：AI 辨識（ERP 的 /api/ai），照片存在這台裝置的 IndexedDB，匯入時附在出貨紀錄 ---------- */
+const IMG_RE = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
+const photoCache = new Map();
+let photoDbP = null;
+function photoDb() {
+  if (!photoDbP) photoDbP = new Promise((ok, bad) => {
+    try { const r = indexedDB.open("shipping-photos", 1); r.onupgradeneeded = () => r.result.createObjectStore("p"); r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); }
+    catch (e) { bad(e); }
+  }).catch(() => null);
+  return photoDbP;
+}
+async function photoTx(mode, fn) {
+  const d = await photoDb(); if (!d) return undefined;
+  return new Promise(ok => { try { const t = d.transaction("p", mode); const r = fn(t.objectStore("p")); t.oncomplete = () => ok(r && r.result); t.onerror = t.onabort = () => ok(undefined); } catch (e) { ok(undefined); } });
+}
+async function photoPut(key, url) { photoCache.set(key, url); await photoTx("readwrite", s => s.put(url, key)); }
+async function photoGet(key) { if (!photoCache.has(key)) { const v = await photoTx("readonly", s => s.get(key)); if (v) photoCache.set(key, v); } return photoCache.get(key) || ""; }
+function photoClear() { photoCache.clear(); photoTx("readwrite", s => s.clear()); }
+function dropUnusedPhotos() {
+  const used = new Set(state.orders.map(o => o.photo).filter(Boolean));
+  [...photoCache.keys()].forEach(k => { if (!used.has(k)) photoCache.delete(k); });
+  photoTx("readwrite", s => { const r = s.getAllKeys(); r.onsuccess = () => r.result.forEach(k => { if (!used.has(k)) s.delete(k); }); return r; });
+}
+async function fillPhoto(img) {
+  const url = await photoGet(img.dataset.photo);
+  if (url) img.src = url; else img.replaceWith(Object.assign(document.createElement("div"), { className: "help", textContent: "這台裝置上找不到照片（可能清除過瀏覽器資料），匯入時不會附照片。" }));
+}
+function photoPanel(o) {
+  const d = o.doubts || [];
+  return `<div class="slip"><img data-photo="${esc(o.photo)}" data-act="photoBig" alt="出貨單照片" title="點一下放大／縮小">
+    <div class="doubts">${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
+    ${o.erp ? "" : o.photoOk ? `<div><span class="pill ok">已核對照片</span></div>` : `<div class="btns"><button class="small primary" data-act="photoOk">已對照片核對，內容正確</button></div>`}</div></div>`;
+}
+// 縮小照片：長邊 max 像素、JPEG（iPhone HEIC 只有 Safari 讀得到）
+async function shrinkImage(file, max, quality) {
+  let src, w, h;
+  try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); w = src.width; h = src.height; }
+  catch (e) {
+    const url = URL.createObjectURL(file);
+    try { src = await new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = url; }); w = src.naturalWidth; h = src.naturalHeight; }
+    catch (e2) { throw new Error("無法讀取這張照片（HEIC 請改用 JPG，或直接按「拍照」）"); }
+    finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  }
+  const k = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", quality);
+}
+const r2 = n => Math.round(n * 100) / 100;
+async function readPhoto(file, src) {
+  if (!ERP_MODE) throw new Error("照片辨識要在牙材 ERP 裡（銷貨 → 出貨單彙整）使用");
+  if (!erp.user) throw new Error("請先登入牙材 ERP 再上傳照片");
+  if (!erpCan("ai")) throw new Error("你的角色沒有 AI 辨識權限，請管理者協助");
+  const forAi = await shrinkImage(file, 2000, 0.85);
+  let keep = await shrinkImage(file, 1400, 0.72);
+  if (keep.length > 1_400_000) keep = await shrinkImage(file, 1000, 0.6);
+  let r;
+  try { r = await erpApi("/api/ai", { method: "POST", body: { mode: "shipping_slip", image: forAi } }); }
+  catch (e) { throw new Error(e.status === 401 ? "ERP 登入已過期，請重新登入" : e.message); }
+  const slips = (r.slips || []).filter(s => s.customer || s.items.length);
+  if (!slips.length) throw new Error((r.problems || []).join("；") || "照片裡沒有讀到出貨單");
+  const key = "p" + uid();
+  await photoPut(key, keep);
+  return slips.map((s, k) => {
+    const doubts = [...(s.doubts || []), ...(k ? [] : r.problems || [])];
+    if (s.tax_included && s.total != null) doubts.push(`單上合計 ${fmt(s.total)} 含稅，品項金額以未稅計`);
+    const items = s.items.map(it => {
+      let price = it.price, amount = it.amount;
+      if (price == null && amount != null && it.qty) price = r2(amount / it.qty);
+      if (amount == null && price != null) amount = r2(it.qty * price);
+      return { code: it.code || "", name: it.name, spec: it.spec || "", qty: it.qty, unit: it.unit || "", price, amount,
+        note: [it.note, it.written ? `單上寫「${it.written}」` : ""].filter(Boolean).join("；") };
+    });
+    const o = mkOrder({ file: file.name + (slips.length > 1 ? `（第 ${k + 1} 張）` : "") + "・照片", src }, cleanCustomer(s.customer), s.date, s.no, items, s.tax_included ? null : s.total, []);
+    o.photo = key; o.doubts = doubts.slice(0, 12); o.photoOk = false;
+    openOrders.add(o.id);
+    return o;
+  });
+}
+$("#photoCam").addEventListener("click", () => $("#photoCamIn").click());
+$("#photoPick").addEventListener("click", () => $("#photoIn").click());
+["#photoCamIn", "#photoIn"].forEach(s => $(s).addEventListener("change", e => { handleFiles(e.target.files); e.target.value = ""; }));
 
 /* ---------- ERP（頁面放在牙材 ERP 網站裡、有 <meta name="erp"> 時才啟用） ---------- */
 const ERP_MODE = !!document.querySelector('meta[name="erp"]');
@@ -1004,7 +1108,11 @@ function renderErp() {
   if (!ERP_MODE) return;
   renderPick();
   $("#erpPanel").hidden = false;
-  $("#privacy").textContent = "檔案在瀏覽器裡讀取，按「匯入 ERP」才會送進 ERP";
+  $("#privacy").textContent = "Word／Excel 在瀏覽器裡讀取，照片送到 ERP 用 AI 辨識；按「匯入 ERP」才會建立訂單";
+  const canPhoto = !!erp.user && erpCan("ai");
+  $("#photoBox").hidden = !canPhoto;
+  fileIn.accept = canPhoto ? ".docx,.doc,.xlsx,.xlsm,.xls,.csv,image/*" : ".docx,.doc,.xlsx,.xlsm,.xls,.csv";
+  $("#dropTypes").textContent = canPhoto ? "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV 和出貨單照片，可一次選多個檔案" : "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案";
   const u = $("#erpUser"); u.hidden = false;
   u.innerHTML = erp.user ? `牙材 ERP · ${esc(erp.user.name || erp.user.email)}　<a href="/#/dashboard">回 ERP</a>` : `<a href="/#/login">登入牙材 ERP</a>`;
   const body = $("#erpBody");
@@ -1020,7 +1128,7 @@ function renderErp() {
   const custOpts = erp.customers.slice().sort((a, b) => a.name.localeCompare(b.name, "zh-Hant")).map(c => `<option value="id:${c.id}">${esc(c.name)}</option>`).join("");
   const unmapped = names.filter(n => !erpMapping(n).value);
   let html = `<div class="erp">
-    <p class="help">每張出貨單會在 ERP 建成一張「已出貨」的訂單：日期用出貨日期、扣庫存，ERP 找不到的產品會自動新增到產品主檔（庫存從 0 起算）。
+    <p class="help">每張出貨單會在 ERP 建成一張「已出貨」的訂單和出貨紀錄（拍照匯入的附上照片）：日期用出貨日期、扣庫存，ERP 找不到的產品會自動新增到產品主檔（庫存從 0 起算）。
     匯入後在 ERP 的應收帳款、月對帳單和收款沖銷都看得到。同一張出貨單（同客戶、同單號）不會重複匯入。
     ${state.settings.tax ? "營業稅設定為外加 5%，訂單會標記「開發票」並加 5% 稅額。" : "營業稅設定為不計，訂單不加稅額；要開發票請把上方營業稅改成外加 5%。"}</p>`;
   if (state.example) html += `<p class="help">目前是範例資料，不會匯入。請上傳你的出貨單。</p>`;
@@ -1048,17 +1156,27 @@ async function erpImport() {
   const created = [], dups = [], errors = [];
   const tax = state.settings.tax > 0;
   try {
-    for (let i = 0; i < ready.length; i += 20) {
-      const chunk = ready.slice(i, i + 20);
-      const payload = chunk.map(o => {
-        const m = erpMapping(o.customer).value;
-        return {
-          ref: o.no || "", date: o.date, need_invoice: tax, file: o.file,
-          ...(m === "new" ? { new_customer: o.customer } : { customer_id: Number(m.slice(3)) }),
-          items: o.items.map(it => ({ code: it.code || "", name: it.name, spec: it.spec || "", unit: it.unit || "", qty: it.qty, unit_price: it.price, amount: it.amount })),
-        };
-      });
-      erp.result = `正在匯入 ${Math.min(i + chunk.length, ready.length)}／${ready.length} 張…`; renderErp();
+    // 每批最多 20 張、約 3MB（Vercel 一次最多收 4.5MB），有照片的出貨單會分成比較小的批次
+    const batches = [];
+    let cur = { orders: [], payload: [], bytes: 0 };
+    for (const o of ready) {
+      const m = erpMapping(o.customer).value;
+      const photo = o.photo ? await photoGet(o.photo) : "";
+      const row = {
+        ref: o.no || "", date: o.date, need_invoice: tax, file: o.file,
+        ...(m === "new" ? { new_customer: o.customer } : { customer_id: Number(m.slice(3)) }),
+        ...(photo ? { photo } : {}),
+        items: o.items.map(it => ({ code: it.code || "", name: it.name, spec: it.spec || "", unit: it.unit || "", qty: it.qty, unit_price: it.price, amount: it.amount })),
+      };
+      const bytes = JSON.stringify(row).length;
+      if (cur.orders.length && (cur.orders.length >= 20 || cur.bytes + bytes > 3_000_000)) { batches.push(cur); cur = { orders: [], payload: [], bytes: 0 }; }
+      cur.orders.push(o); cur.payload.push(row); cur.bytes += bytes;
+    }
+    if (cur.orders.length) batches.push(cur);
+    let sent = 0;
+    for (const { orders: chunk, payload } of batches) {
+      sent += chunk.length;
+      erp.result = `正在匯入 ${sent}／${ready.length} 張…`; renderErp();
       const r = await erpApi("/api/orders", { method: "POST", body: { action: "import_shipped", deduct_stock: true, orders: payload } });
       r.results.forEach(x => {
         const o = chunk[x.index];
