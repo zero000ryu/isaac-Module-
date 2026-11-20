@@ -104,6 +104,11 @@ details.panel>summary{cursor:pointer;font-weight:700}
 .slip img{width:220px;max-width:100%;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--bg)}
 .slip img.big{width:100%;max-width:900px;cursor:zoom-out}
 .slip .doubts{flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+/* 手機上出貨單表格比螢幕寬：照片區固定在畫面寬度內，不會被切掉 */
+.slip{position:sticky;left:0;max-width:calc(100vw - 100px)}
+@media (max-width:640px){.slip img{width:100%;max-width:none;max-height:45vh;object-fit:contain}.slip img.big{max-height:none}.slip .doubts{min-width:0;flex-basis:100%}}
+.slip .custedit{display:flex;gap:8px;align-items:center}
+.slip .custedit input{flex:1;min-width:0;font-size:16px}
 .slip .doubts ul{margin:0;padding-left:18px;color:var(--warn)}
 .topright{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .erpuser{font-size:12px;color:var(--muted)}
@@ -207,7 +212,7 @@ a.pill{text-decoration:none}
         <tbody id="arBody"></tbody>
       </table>
     </div>
-    <p class="help">點一列可以看到這個月的出貨單（依日期排序）。</p>
+    <p class="help">點一列可以看到這個月的出貨單（依日期排序）。客戶名稱錯了請到下方「出貨單」修改（照片匯入的在照片旁邊就能改）。</p>
   </section>
 
   <section class="panel" id="erpPanel" hidden>
@@ -721,7 +726,9 @@ function renderAliases() {
   const counts = new Map();
   state.orders.forEach(o => { if (o.customer) counts.set(o.customer, (counts.get(o.customer) || 0) + 1); });
   const names = [...counts.keys()].sort((a, b) => a.localeCompare(b, "zh-Hant"));
-  $("#custList").innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join("");
+  // ERP 裡的客戶也列進輸入建議（打幾個字就會跳出完整名稱）
+  const all = new Set([...names, ...(ERP_MODE && erp.user ? erp.customers.map(c => c.name) : [])]);
+  $("#custList").innerHTML = [...all].map(n => `<option value="${esc(n)}"></option>`).join("");
   $("#aliases").innerHTML = names.length ? names.map((n, i) => `<div class="alias"><input type="text" id="alias-${i}" data-alias="${esc(n)}" value="${esc(n)}" list="custList" aria-label="客戶名稱 ${esc(n)}"><span>${counts.get(n)} 張</span></div>`).join("") : `<div class="help">還沒有客戶。</div>`;
 }
 function renderOrders() {
@@ -967,6 +974,7 @@ ordBody.addEventListener("click", e => {
     else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
     return;
   }
+  if (act === "pickCust") { o.customer = b.dataset.name; o.custCandidates = []; save(); render(); toast(`客戶改成「${o.customer}」`); return; }
   if (act === "photoOk") { o.photoOk = true; save(); render(); toast("已核對"); return; }
   if (act === "photoBig") { b.classList.toggle("big"); return; }
   if (act === "fixAmt") { const it = o.items[+b.closest("tr[data-i]").dataset.i]; it.amount = expectedAmt(it); o.stated = null; save(); render(); toast("已改成數量×單價"); return; }
@@ -1005,7 +1013,10 @@ async function fillPhoto(img) {
 function photoPanel(o) {
   const d = o.doubts || [];
   return `<div class="slip"><img data-photo="${esc(o.photo)}" data-act="photoBig" alt="出貨單照片" title="點一下放大／縮小">
-    <div class="doubts">${o.slipNote ? `<div><b>單上備註：</b>${esc(o.slipNote)}（匯入時寫進 ERP 訂單備註）</div>` : ""}${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
+    <div class="doubts">
+    <label class="custedit"><b>客戶</b><input type="text" id="pc-${o.id}" data-f="customer" value="${esc(o.customer)}" list="custList" placeholder="輸入客戶名稱" aria-label="客戶名稱"></label>
+    ${o.custCandidates && o.custCandidates.length && !o.erp ? `<div><b>可能是：</b><span class="btns">${o.custCandidates.map(n => `<button class="small" data-act="pickCust" data-name="${esc(n.replace(/（.*）$/, ""))}">${esc(n)}</button>`).join("")}</span></div>` : ""}
+    ${o.slipNote ? `<div><b>單上備註：</b>${esc(o.slipNote)}（匯入時寫進 ERP 訂單備註）</div>` : ""}${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
     ${o.erp ? "" : o.photoOk ? `<div><span class="pill ok">已核對照片</span></div>` : `<div class="btns"><button class="small primary" data-act="photoOk">已對照片核對，內容正確</button></div>`}</div></div>`;
 }
 // 縮小照片：長邊 max 像素、JPEG（iPhone HEIC 只有 Safari 讀得到）
@@ -1040,6 +1051,8 @@ async function readPhoto(file, src) {
   await photoPut(key, keep);
   return slips.map((s, k) => {
     const doubts = [...(s.doubts || []), ...(k ? [] : r.problems || [])];
+    if (s.customer_how) doubts.unshift(s.customer_how);
+    if (s.customer_candidates && s.customer_candidates.length) doubts.unshift(`客戶「${s.customer}」看不太清楚，請從下面的候選選一個，或直接改客戶名稱`);
     if (s.tax_included && s.total != null) doubts.push(`單上合計 ${fmt(s.total)} 含稅，品項金額以未稅計`);
     s.items.filter(it => it.erp_price).forEach(it => doubts.push(`「${it.name}」單上沒寫單價，先帶入 ERP 定價 ${fmt(it.price)}`));
     const noPrice = s.items.filter(it => it.price == null && it.amount == null).length;
@@ -1053,6 +1066,9 @@ async function readPhoto(file, src) {
     });
     const o = mkOrder({ file: file.name + (slips.length > 1 ? `（第 ${k + 1} 張）` : "") + "・照片", src }, cleanCustomer(s.customer), s.date, s.no, items, s.tax_included ? null : s.total, []);
     o.photo = key; o.doubts = doubts.slice(0, 14); o.photoOk = false; o.slipNote = s.note || "";
+    o.custCandidates = s.customer_candidates || [];
+    // 印章代碼對到 ERP 客戶：直接設定「對應 ERP 客戶」
+    if (s.customer_id && o.customer) { state.erpMap = state.erpMap || {}; state.erpMap[o.customer] = "id:" + s.customer_id; }
     openOrders.add(o.id);
     return o;
   });
