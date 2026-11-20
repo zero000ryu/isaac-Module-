@@ -99,6 +99,7 @@ details.panel>summary{cursor:pointer;font-weight:700}
 .help{font-size:13px;color:var(--muted)}
 .photo{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .photo strong{font-size:14px}
+.btnlink{display:inline-block;border-radius:6px;background:var(--accent);color:var(--accent-ink);padding:7px 12px;text-decoration:none;font-weight:500}
 .slip{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
 .slip img{width:220px;max-width:100%;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--bg)}
 .slip img.big{width:100%;max-width:900px;cursor:zoom-out}
@@ -150,7 +151,8 @@ a.pill{text-decoration:none}
       <input id="file" type="file" multiple accept=".docx,.doc,.xlsx,.xlsm,.xls,.csv" hidden>
       <div id="photoBox" class="photo" hidden>
         <strong>拍出貨單照片匯入</strong>
-        <div class="btns"><button id="photoCam" class="primary">📷 拍照</button><button id="photoPick">選擇照片</button></div>
+        <div class="btns" id="photoBtns"><button id="photoCam" class="primary">📷 拍照</button><button id="photoPick">🖼️ 選擇照片／圖片檔</button></div>
+        <div id="photoMsg" class="help" hidden></div>
         <small class="help">AI 讀出客戶、日期、單號和品項（約 10～30 秒一張），核對照片後按下方「匯入 ERP」，就會建立已出貨的訂單和出貨單，照片存在出貨紀錄裡。</small>
         <input id="photoCamIn" type="file" accept="image/*" capture="environment" hidden>
         <input id="photoIn" type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple hidden>
@@ -1058,6 +1060,7 @@ $("#photoPick").addEventListener("click", () => $("#photoIn").click());
 
 /* ---------- ERP（頁面放在牙材 ERP 網站裡、有 <meta name="erp"> 時才啟用） ---------- */
 const ERP_MODE = !!document.querySelector('meta[name="erp"]');
+const LOGIN_URL = "/?back=" + encodeURIComponent(location.pathname) + "#/login";
 const erp = { ready: false, user: null, perms: [], customers: [], busy: false, result: null, error: "" };
 const erpCan = p => erp.perms.includes("*") || erp.perms.includes(p);
 const erpKey = s => norm(s).replace(/[\s()\[\]【】\-_/、,，。:：]+/g, "").toLowerCase();
@@ -1109,15 +1112,22 @@ function renderErp() {
   renderPick();
   $("#erpPanel").hidden = false;
   $("#privacy").textContent = "Word／Excel 在瀏覽器裡讀取，照片送到 ERP 用 AI 辨識；按「匯入 ERP」才會建立訂單";
+  // 拍照區在 ERP 裡一律顯示；還沒登入或沒有 AI 權限時，按鈕換成說明
   const canPhoto = !!erp.user && erpCan("ai");
-  $("#photoBox").hidden = !canPhoto;
+  $("#photoBox").hidden = false;
+  $("#photoBtns").hidden = !canPhoto;
+  const pm = $("#photoMsg");
+  pm.hidden = canPhoto;
+  pm.innerHTML = canPhoto ? "" : !erp.ready ? "正在連線 ERP…" : !erp.user
+    ? `要先登入牙材 ERP 才能拍照或上傳圖片。<div class="btns" style="margin-top:6px"><a class="btnlink" href="${LOGIN_URL}">登入牙材 ERP</a></div>`
+    : "你的角色沒有 AI 辨識權限，不能用照片匯入，請管理者在「使用者與角色」協助。";
   fileIn.accept = canPhoto ? ".docx,.doc,.xlsx,.xlsm,.xls,.csv,image/*" : ".docx,.doc,.xlsx,.xlsm,.xls,.csv";
   $("#dropTypes").textContent = canPhoto ? "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV 和出貨單照片，可一次選多個檔案" : "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案";
   const u = $("#erpUser"); u.hidden = false;
-  u.innerHTML = erp.user ? `牙材 ERP · ${esc(erp.user.name || erp.user.email)}　<a href="/#/dashboard">回 ERP</a>` : `<a href="/#/login">登入牙材 ERP</a>`;
+  u.innerHTML = erp.user ? `牙材 ERP · ${esc(erp.user.name || erp.user.email)}　<a href="/#/dashboard">回 ERP</a>` : `<a href="${LOGIN_URL}">登入牙材 ERP</a>`;
   const body = $("#erpBody");
   if (!erp.ready) { body.innerHTML = `<p class="help">正在連線 ERP…</p>`; $("#erpStats").innerHTML = ""; return; }
-  if (!erp.user) { body.innerHTML = `<div class="alert"><span>${erp.error ? esc(erp.error) + "。" : ""}還沒登入 ERP。請先<a href="/#/login">登入</a>，再回到這一頁重新整理。</span></div>`; return; }
+  if (!erp.user) { body.innerHTML = `<div class="alert"><span>${erp.error ? esc(erp.error) + "。" : ""}還沒登入 ERP。請先<a href="${LOGIN_URL}">登入</a>，登入後會回到這一頁。</span></div>`; return; }
   if (!["orders.write", "shipments.write", "products.write"].every(erpCan)) { body.innerHTML = `<p class="help">你的角色不能匯入出貨單（需要訂貨單、出貨和產品的權限），請管理者協助。</p>`; return; }
   const ready = erpReady();
   const done = state.orders.filter(o => o.erp).length;
