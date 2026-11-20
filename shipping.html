@@ -1,0 +1,1377 @@
+<title>出貨應收彙整</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="上傳 Word 或 Excel 出貨單，依客戶與月份整理成應收帳款 Excel。">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one working column — intake (files + settings) on top, receivables summary next, shipping-order review last. Carbon-copy blue on cool paper. */
+:root{
+  --bg:#f3f5f8; --panel:#ffffff; --ink:#18202e; --muted:#5b6577; --line:#dbe0e8;
+  --accent:#2747a8; --accent-ink:#ffffff; --accent-soft:#e4eaf9;
+  --warn:#a8461d; --warn-soft:#fbebe3; --ok:#22714a; --ok-soft:#e1f1e8;
+  --example:#7a5a00; --example-soft:#fbf2d4;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10141b; --panel:#171d27; --ink:#e4e9f1; --muted:#98a3b5; --line:#2a3342;
+    --accent:#8fa8f0; --accent-ink:#0d1424; --accent-soft:#1f2a45;
+    --warn:#f09a72; --warn-soft:#3a2219; --ok:#7fd1a3; --ok-soft:#183026;
+    --example:#e5c564; --example-soft:#342c12; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10141b; --panel:#171d27; --ink:#e4e9f1; --muted:#98a3b5; --line:#2a3342;
+  --accent:#8fa8f0; --accent-ink:#0d1424; --accent-soft:#1f2a45;
+  --warn:#f09a72; --warn-soft:#3a2219; --ok:#7fd1a3; --ok-soft:#183026;
+  --example:#e5c564; --example-soft:#342c12; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:22px;margin:0;text-wrap:balance;letter-spacing:.02em}
+h2{font-size:16px;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.privacy{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.intake{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.intake{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px 16px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;min-height:170px;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font-size:16px}
+.drop small{color:var(--muted)}
+.settings{display:flex;flex-direction:column;gap:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted);letter-spacing:.04em}
+select,input[type=text],input[type=date],input[type=search],input[type=number]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;width:100%}
+select:focus,input:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;white-space:nowrap}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+button.small{padding:3px 8px;font-size:12px}
+button.link{border:none;background:none;color:var(--accent);padding:2px 4px}
+button.danger{color:var(--warn)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--example-soft);color:var(--example);border-radius:8px;padding:10px 14px}
+.log{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.log .err{color:var(--warn)}
+.sechead{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.stats{display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:13px}
+.stats b{color:var(--ink)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:500;background:var(--bg);letter-spacing:.04em;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.r,th.r{text-align:right}
+tr.cust td{background:var(--accent-soft);font-weight:700}
+tr.grp{cursor:pointer}
+tr.grp:hover td{background:var(--bg)}
+.arname{font-weight:500}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.ex{background:var(--example-soft);color:var(--example)}
+td.bad{color:var(--warn);font-weight:700}
+input.badin{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.alert{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+tr.sub td{background:var(--bg);font-size:13px}
+.inner{padding:8px 4px 10px}
+.inner table{min-width:720px}
+.inner input{padding:3px 6px;font-size:13px}
+.inner td{padding:3px 4px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.toolbar input[type=search]{max-width:260px}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+details.panel>summary{cursor:pointer;font-weight:700}
+.aliases{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:12px}
+.alias{display:flex;gap:8px;align-items:center}
+.alias span{font-size:12px;color:var(--muted);white-space:nowrap}
+.empty{color:var(--muted);padding:18px;text-align:center}
+.src{font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;max-width:calc(100% - 32px);z-index:20}
+.help{font-size:13px;color:var(--muted)}
+.photo{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.photo strong{font-size:14px}
+.btnlink{display:inline-block;border-radius:6px;background:var(--accent);color:var(--accent-ink);padding:7px 12px;text-decoration:none;font-weight:500}
+.slip{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+.slip img{width:220px;max-width:100%;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--bg)}
+.slip img.big{width:100%;max-width:900px;cursor:zoom-out}
+.slip .doubts{flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+/* 手機上出貨單表格比螢幕寬：照片區固定在畫面寬度內，不會被切掉 */
+.slip{position:sticky;left:0;max-width:calc(100vw - 100px)}
+@media (max-width:640px){.slip img{width:100%;max-width:none;max-height:45vh;object-fit:contain}.slip img.big{max-height:none}.slip .doubts{min-width:0;flex-basis:100%}}
+.blocked{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:13px}
+.blocked ul{margin:6px 0 0;padding-left:18px}
+.blocked li{margin:3px 0}
+.slip .custedit{display:flex;gap:8px;align-items:center}
+.slip .custedit input{flex:1;min-width:0;font-size:16px}
+.slip .doubts ul{margin:0;padding-left:18px;color:var(--warn)}
+.topright{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.erpuser{font-size:12px;color:var(--muted)}
+.erpuser a,.erp a{color:var(--accent)}
+.erp{display:flex;flex-direction:column;gap:12px}
+.erp .tablebox table{min-width:520px}
+.erp select{max-width:340px}
+.erp .result{font-size:13px;display:flex;flex-direction:column;gap:4px}
+.erp .result .err{color:var(--warn)}
+a.pill{text-decoration:none}
+.pick{display:flex;flex-direction:column;gap:8px}
+.small-link{font-size:13px;color:var(--accent);align-self:center}
+.pick .list{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pick label.row{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
+.pick label.row:last-child{border-bottom:none}
+.pick label.row span.m{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+.help li{margin:2px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>出貨應收彙整</h1>
+      <p class="sub">上傳 Word、Excel 出貨單，依客戶、帳款月份整理成「XX牙醫-X月份應收款」Excel。</p>
+    </div>
+    <div class="topright">
+      <span class="privacy" id="privacy">檔案只在你的瀏覽器裡處理，不會上傳到任何伺服器</span>
+      <span id="erpUser" class="erpuser" hidden></span>
+    </div>
+  </header>
+
+  <div id="exampleBanner" class="banner" hidden>
+    <span>目前顯示的是<b>範例資料</b>（虛構的診所與品項），上傳你的出貨單後會自動清掉。</span>
+    <button id="clearExample" class="small">清除範例</button>
+  </div>
+
+  <section class="intake">
+    <div class="panel" style="display:flex;flex-direction:column;gap:10px">
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="選擇出貨單檔案">
+        <strong>把出貨單拖到這裡，或點一下選擇檔案</strong>
+        <small id="dropTypes">支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案</small>
+        <small>舊版 Word（.doc）請先在 Word 另存成 .docx</small>
+      </div>
+      <input id="file" type="file" multiple accept=".docx,.doc,.xlsx,.xlsm,.xls,.csv" hidden>
+      <div id="photoBox" class="photo" hidden>
+        <strong>拍出貨單照片匯入</strong>
+        <div class="btns" id="photoBtns"><button id="photoCam" class="primary">📷 拍照</button><button id="photoPick">🖼️ 選擇照片／圖片檔</button></div>
+        <div id="photoMsg" class="help" hidden></div>
+        <small class="help">AI 讀出客戶、日期、單號和品項（約 10～30 秒一張），核對照片後按下方「匯入 ERP」，就會建立已出貨的訂單和出貨單，照片存在出貨紀錄裡。</small>
+        <input id="photoCamIn" type="file" accept="image/*" capture="environment" hidden>
+        <input id="photoIn" type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple hidden>
+      </div>
+      <div id="pick" class="pick" hidden>
+        <div class="btns"><button id="pickOpen" class="small">從檔案網站選擇出貨單</button><a class="small-link" href="/tools/files.html">開啟檔案網站</a></div>
+        <div id="pickBox" hidden></div>
+      </div>
+      <div id="log" class="log"></div>
+    </div>
+    <div class="panel settings">
+      <h2>帳款設定</h2>
+      <div class="field">
+        <label for="cutoff">每月結帳日</label>
+        <select id="cutoff"></select>
+      </div>
+      <div class="field">
+        <label for="tax">營業稅</label>
+        <select id="tax">
+          <option value="0">不計（金額已含稅或免稅）</option>
+          <option value="5">外加 5%</option>
+        </select>
+      </div>
+      <div class="btns">
+        <button id="dlAll" class="primary">下載彙整 Excel</button>
+        <button id="dlZip">每張應收單各一檔（ZIP）</button>
+      </div>
+      <div class="btns" id="fsSave" hidden>
+        <button id="fsAll" class="small">彙整 Excel 存到檔案網站</button>
+        <button id="fsEach" class="small">每張應收單存到檔案網站</button>
+      </div>
+      <div class="btns">
+        <button id="addOrder" class="small">手動新增出貨單</button>
+        <button id="clearAll" class="small danger">清除全部</button>
+      </div>
+      <div id="amtAlert" class="alert" hidden></div>
+      <div id="confirmClear" class="banner" hidden>
+        <span>確定清除所有出貨單？</span>
+        <span class="btns"><button id="clearYes" class="small danger">清除</button><button id="clearNo" class="small">取消</button></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="sechead">
+      <h2>應收帳款</h2>
+      <div id="stats" class="stats"></div>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>應收單名稱</th><th>計算期間</th><th class="r">出貨單</th><th class="r">未稅</th><th class="r">營業稅</th><th class="r">應收金額</th><th></th></tr></thead>
+        <tbody id="arBody"></tbody>
+      </table>
+    </div>
+    <p class="help">點一列可以看到這個月的出貨單（依日期排序）。客戶名稱錯了請到下方「出貨單」修改（照片匯入的在照片旁邊就能改）。</p>
+  </section>
+
+  <section class="panel" id="erpPanel" hidden>
+    <div class="sechead">
+      <h2>匯入 ERP</h2>
+      <div id="erpStats" class="stats"></div>
+    </div>
+    <div id="erpBody"></div>
+  </section>
+
+  <details class="panel" id="aliasBox">
+    <summary>客戶名稱整理</summary>
+    <p class="help">同一家診所在不同出貨單上寫法不同（例如「仁心牙醫」和「仁心牙醫診所」）時，在這裡把名稱改成一樣，就會合併成同一個客戶。</p>
+    <div id="aliases" class="aliases"></div>
+  </details>
+
+  <section class="panel">
+    <div class="sechead">
+      <h2>出貨單</h2>
+      <div id="ordStats" class="stats"></div>
+    </div>
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="搜尋客戶、單號、品名、檔名">
+      <label class="chk"><input id="onlyWarn" type="checkbox"> 只看需要確認的</label>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>客戶</th><th>出貨日期</th><th>單號</th><th class="r">品項</th><th class="r">金額</th><th>狀態</th><th>來源檔案</th><th></th></tr></thead>
+        <tbody id="ordBody"></tbody>
+      </table>
+    </div>
+    <datalist id="custList"></datalist>
+  </section>
+
+  <details class="panel">
+    <summary>讀取規則說明</summary>
+    <ul class="help">
+      <li>客戶：找「客戶名稱、客戶、診所名稱、收貨單位、買受人」等欄位；找不到時，找文字裡的「XX牙醫、XX診所、XX牙科、XX醫院」，再找工作表名稱和檔名。</li>
+      <li>日期：找「出貨日期、送貨日期、日期」等欄位，接受 2026/10/05、2026-10-5、115/10/05（民國）、115年10月5日、20261005。</li>
+      <li>品項：找含有「品名」和「數量」或「金額」的表頭列，往下讀到「合計、總計、以下空白」為止。沒有金額時用數量 × 單價計算。</li>
+      <li>一個 Word 檔或一個 Excel 工作表裡有多張出貨單也可以，每出現一次表頭就算一張；Excel 若是一列一筆、有「客戶」「日期」欄的流水帳，也會自動拆開。</li>
+      <li>帳款月份：結帳日設為月底時依出貨日期的月份；設為 25 日時，10/26～11/25 的出貨算 11 月份。</li>
+      <li>品項的金額和「數量×單價」相差超過 1 元時會標紅，並提示正確金額，可以一鍵改正；下載的「出貨明細」也會在「檢查」欄註明。</li>
+      <li>讀不到或金額對不起來的出貨單會標「需確認」，可以直接在表格裡修改。</li>
+    </ul>
+  </details>
+</div>
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* ---------- state ---------- */
+const STORE = "shipping-ar-v1";
+let state = { orders: [], settings: { cutoff: 0, tax: 0 }, example: false, seen: [] };
+const openGroups = new Set(), openOrders = new Set(), closedOrders = new Set();
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const fmt = n => (n == null || isNaN(n)) ? "" : Math.round(n).toLocaleString("zh-TW");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(STORE) || "null"); if (s && Array.isArray(s.orders)) { state = Object.assign(state, s); return true; } } catch (e) {}
+  return false;
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3200); }
+
+/* ---------- text helpers ---------- */
+function norm(s) {
+  return String(s ?? "").replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/　/g, " ").replace(/\r/g, "");
+}
+const squash = s => norm(s).replace(/\s+/g, "");
+function parseNum(v) {
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  let s = norm(v).replace(/[,\s$元]|NT|NTD/gi, "");
+  if (/^\(.*\)$/.test(s)) s = "-" + s.slice(1, -1);
+  return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+function mkDate(y, m, d) {
+  y = +y; m = +m; d = +d;
+  if (y < 100) y = y <= 50 ? 2000 + y : y + 1911;
+  else if (y < 1000) y += 1911;
+  if (y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCMonth() !== m - 1) return "";
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
+function parseDate(v) {
+  const s = norm(v);
+  let m = s.match(/(?<!\d)(\d{2,4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})(?!\d)/);
+  if (m) { const r = mkDate(m[1], m[2], m[3]); if (r) return r; }
+  m = s.match(/(?<!\d)((?:19|20)\d{2})(\d{2})(\d{2})(?!\d)/);
+  if (m) { const r = mkDate(m[1], m[2], m[3]); if (r) return r; }
+  m = s.match(/(?<!\d)(1\d{2})(\d{2})(\d{2})(?!\d)/);
+  if (m) { const r = mkDate(m[1], m[2], m[3]); if (r) return r; }
+  return "";
+}
+const CLINIC_RE = /[一-鿿A-Za-z0-9()]{1,20}?(?:牙醫聯合診所|牙醫診所|牙科診所|牙醫|牙科|診所|醫院|醫學中心)/;
+function cleanCustomer(s) {
+  return norm(s).replace(/\s+/g, " ").replace(/^[\s:：]+|[\s:：,，。]+$/g, "").slice(0, 40).trim();
+}
+
+/* ---------- labels ---------- */
+const LABELS = [
+  ["customer", ["客戶名稱", "客戶全名", "客户名稱", "診所名稱", "院所名稱", "收貨單位", "訂購單位", "買受人", "單位名稱", "公司名稱", "客戶", "客户", "診所", "收貨人", "訂購人"]],
+  ["date", ["出貨日期", "送貨日期", "交貨日期", "出庫日期", "銷貨日期", "開單日期", "單據日期", "訂單日期", "日期"]],
+  ["no", ["出貨單號", "送貨單號", "銷貨單號", "出貨單編號", "單據號碼", "單據編號", "單號", "編號", "NO.", "No.", "NO"]],
+  ["skip", ["客戶編號", "客戶代號", "客戶代碼", "統一編號", "統編", "電話", "TEL", "傳真", "FAX", "地址", "送貨地址", "聯絡人", "業務", "業務員", "經手人", "有效日期", "效期", "列印日期", "付款方式", "付款條件", "頁次", "備註", "收款日期", "交易條件"]],
+];
+const LABEL_LIST = [];
+LABELS.forEach(([field, arr]) => arr.forEach((l, i) => LABEL_LIST.push({ field, label: l, pri: i })));
+LABEL_LIST.sort((a, b) => b.label.length - a.label.length);
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LABEL_RE = new RegExp("(?<![\\u4e00-\\u9fffA-Za-z])(" + LABEL_LIST.map(x => [...x.label].map(reEsc).join("\\s*")).join("|") + ")\\s*[:：]", "gi");
+const LABEL_EXACT = new Map(LABEL_LIST.map(x => [squash(x.label).toLowerCase(), x]));
+function labelOf(text) {
+  const k = squash(text).replace(/[:：]$/, "").toLowerCase();
+  return LABEL_EXACT.get(k);
+}
+
+/* find labelled meta in a list of rows */
+function extractMeta(rows) {
+  const found = { customer: [], date: [], no: [] };
+  const add = (lab, val) => {
+    if (!lab || lab.field === "skip" || !found[lab.field]) return;
+    val = norm(val).split(/\t|\n|\s{2,}/).map(x => x.trim()).filter(Boolean)[0] || "";
+    if (!val) return;
+    if (lab.field === "date") { val = parseDate(val); if (!val) return; }
+    if (lab.field === "no") { val = val.split(/\s/)[0]; if (!/[0-9A-Za-z]/.test(val)) return; }
+    if (lab.field === "customer") { val = cleanCustomer(val); if (!val || labelOf(val)) return; }
+    found[lab.field].push({ pri: lab.pri, val });
+  };
+  const nextVal = (row, ci) => { for (let j = ci + 1; j < row.length; j++) { const t = norm(row[j]).trim(); if (t) return labelOf(t) ? "" : t; } return ""; };
+  rows.forEach(row => row.forEach((cell, ci) => {
+    const text = norm(cell);
+    if (!text.trim()) return;
+    const exact = labelOf(text);
+    if (exact) { add(exact, nextVal(row, ci)); return; }
+    const ms = [...text.matchAll(LABEL_RE)];
+    ms.forEach((m, i) => {
+      const key = squash(m[1]).toLowerCase();
+      const lab = LABEL_LIST.find(x => squash(x.label).toLowerCase() === key);
+      const end = m.index + m[0].length;
+      let val = text.slice(end, i + 1 < ms.length ? ms[i + 1].index : undefined);
+      if (!val.trim() && i === ms.length - 1) val = nextVal(row, ci);
+      add(lab, val);
+    });
+  }));
+  const pick = arr => arr.length ? arr.slice().sort((a, b) => a.pri - b.pri)[0].val : "";
+  const meta = { customer: pick(found.customer), date: pick(found.date), no: pick(found.no) };
+  if (!meta.customer) {
+    for (const row of rows) { for (const c of row) { const m = norm(c).match(CLINIC_RE); if (m) { meta.customer = cleanCustomer(m[0]); break; } } if (meta.customer) break; }
+  }
+  if (!meta.date) {
+    for (const row of rows) { for (const c of row) { const d = parseDate(c); if (d) { meta.date = d; break; } } if (meta.date) break; }
+  }
+  return meta;
+}
+
+/* ---------- item table ---------- */
+const HEAD = {
+  name: ["品名", "品項", "品名規格", "品名/規格", "品名及規格", "產品名稱", "商品名稱", "貨品名稱", "材料名稱", "品名型號", "項目", "產品", "商品", "貨品", "名稱", "品名/型號", "描述", "DESCRIPTION", "ITEM"],
+  spec: ["規格", "型號", "規格型號", "尺寸", "顏色", "包裝", "SPEC"],
+  code: ["料號", "貨號", "產品編號", "商品編號", "品號", "代號", "編號", "產品代號"],
+  qty: ["數量", "出貨數量", "實出數量", "訂購數量", "個數", "件數", "QTY", "數"],
+  unit: ["單位", "UNIT"],
+  price: ["單價", "售價", "價格", "單價(元)", "PRICE", "定價"],
+  amount: ["金額", "小計", "總價", "總額", "合計金額", "出貨金額", "銷售金額", "未稅金額", "含稅金額", "金額小計", "AMOUNT", "合計"],
+  note: ["備註", "說明", "附註"],
+  lot: ["批號", "LOT", "批號/效期"],
+  exp: ["效期", "有效日期", "有效期限", "保存期限"],
+  customer: ["客戶", "客戶名稱", "診所", "診所名稱", "客户"],
+  date: ["日期", "出貨日期", "送貨日期", "交貨日期", "銷貨日期"],
+  no: ["單號", "出貨單號", "銷貨單號", "單據號碼"],
+};
+const HEAD_MAP = new Map();
+Object.entries(HEAD).forEach(([f, arr]) => arr.forEach(k => { const kk = squash(k).toLowerCase(); if (!HEAD_MAP.has(kk)) HEAD_MAP.set(kk, f); }));
+function headField(cell) {
+  const k = squash(cell).replace(/[(（][^)）]*[)）]/g, "").replace(/[:：$]/g, "").toLowerCase();
+  if (!k || k.length > 10) return null;
+  return HEAD_MAP.get(k) || null;
+}
+function headerCols(row) {
+  const cols = {};
+  row.forEach((c, i) => { const f = headField(c); if (f && cols[f] == null) cols[f] = i; });
+  if (cols.name == null && cols.code != null && (cols.qty != null)) { cols.name = cols.code; delete cols.code; }
+  if (cols.name == null || (cols.qty == null && cols.amount == null)) return null;
+  return cols;
+}
+const STOP_RE = /^(合\s*計|總\s*計|小\s*計|總金額|應收|本頁|本單|以下空白|稅額|營業稅|含稅|未稅|total)/i;
+
+function parseItems(rows, start, cols) {
+  const items = []; let stated = null, i = start;
+  const get = (row, f) => cols[f] == null ? "" : norm(row[cols[f]] ?? "").replace(/\s*\n\s*/g, " ").trim();
+  const raw = (row, f) => cols[f] == null ? "" : row[cols[f]];
+  for (; i < rows.length; i++) {
+    const row = rows[i];
+    if (headerCols(row)) break;
+    const first = row.map(c => norm(c).trim()).find(Boolean) || "";
+    if (STOP_RE.test(first.replace(/\s/g, "")) || /以下空白/.test(row.join(""))) {
+      if (/以下空白/.test(row.join(""))) { i++; continue; }
+      let v = parseNum(raw(row, "amount"));
+      if (v == null) { for (let j = row.length - 1; j >= 0; j--) { const n = parseNum(row[j]); if (n != null) { v = n; break; } } }
+      if (stated == null && v != null && /合|總|小/.test(first)) stated = v;
+      i++;
+      // keep reading tax/total lines that follow, then stop
+      while (i < rows.length && STOP_RE.test((rows[i].map(c => norm(c).trim()).find(Boolean) || "").replace(/\s/g, ""))) i++;
+      break;
+    }
+    const name = get(row, "name");
+    let qtyS = get(row, "qty");
+    let qty = parseNum(raw(row, "qty"));
+    let unit = get(row, "unit");
+    if (qty == null && qtyS) { const m = qtyS.match(/^(-?[\d.]+)\s*(\S*)$/); if (m) { qty = parseFloat(m[1]); if (!unit) unit = m[2]; } }
+    let price = parseNum(raw(row, "price"));
+    let amount = parseNum(raw(row, "amount"));
+    if (!name || (qty == null && amount == null && price == null)) continue;
+    if (STOP_RE.test(name.replace(/\s/g, ""))) continue;
+    if (amount == null && qty != null && price != null) amount = Math.round(qty * price * 100) / 100;
+    if (price == null && amount != null && qty) price = Math.round(amount / qty * 100) / 100;
+    const notes = [get(row, "note"), get(row, "lot") && "批號 " + get(row, "lot"), get(row, "exp") && "效期 " + get(row, "exp")].filter(Boolean).join("；");
+    const it = { code: get(row, "code"), name, spec: get(row, "spec"), qty, unit, price, amount, note: notes };
+    if (cols.customer != null) it._c = cleanCustomer(get(row, "customer"));
+    if (cols.date != null) it._d = parseDate(get(row, "date"));
+    if (cols.no != null) it._n = get(row, "no");
+    items.push(it);
+  }
+  return { items, stated, end: i - 1 };
+}
+
+/* grid = array of rows (array of cell strings/numbers) → orders */
+function gridToOrders(rows, ctx) {
+  const heads = [];
+  for (let i = 0; i < rows.length; i++) { const c = headerCols(rows[i]); if (c) heads.push({ i, cols: c }); }
+  const fallbackCust = () => { for (const s of [ctx.sheet, ctx.file]) { const m = norm(s || "").match(CLINIC_RE); if (m) return cleanCustomer(m[0]); } return ""; };
+  const fallbackDate = () => parseDate(ctx.file.replace(/\.[^.]+$/, ""));
+  if (!heads.length) {
+    const meta = extractMeta(rows);
+    if (!meta.customer && !meta.date && !rows.some(r => r.some(c => norm(c).trim()))) return [];
+    return [mkOrder(ctx, meta.customer || fallbackCust(), meta.date || fallbackDate(), meta.no, [], null, ["找不到品項表格"])];
+  }
+  const parsed = heads.map(h => ({ h, ...parseItems(rows, h.i + 1, h.cols) }));
+  const out = [];
+  let prev = null;
+  parsed.forEach((p, k) => {
+    const beforeStart = k ? parsed[k - 1].end + 1 : 0;
+    const before = rows.slice(beforeStart, p.h.i);
+    const afterEnd = k + 1 < parsed.length ? parsed[k + 1].h.i : rows.length;
+    const after = rows.slice(p.end + 1, afterEnd);
+    const mb = extractMeta(before), ma = extractMeta(after);
+    const hasOwn = !!(mb.customer || mb.date || mb.no);
+    let meta = { customer: mb.customer || ma.customer, date: mb.date || ma.date, no: mb.no || ma.no };
+    if (!hasOwn && prev) meta = { customer: meta.customer || prev.customer, date: meta.date || prev.date, no: meta.no || prev.no };
+    if (!meta.customer) meta.customer = fallbackCust();
+    if (!meta.date) meta.date = fallbackDate();
+    // flat ledger: split by per-row customer/date/no
+    const keyOf = it => [it._c || meta.customer, it._d || meta.date, it._n || meta.no].join("\u0001");
+    const groups = new Map();
+    p.items.forEach(it => { const k2 = keyOf(it); if (!groups.has(k2)) groups.set(k2, []); groups.get(k2).push(it); });
+    if (!groups.size) groups.set(keyOf({}), []);
+    const multi = groups.size > 1;
+    groups.forEach((items, k2) => {
+      const [c, d, n] = k2.split("\u0001");
+      items.forEach(it => { delete it._c; delete it._d; delete it._n; });
+      const last = out[out.length - 1];
+      if (!multi && last && last.customer === c && last.date === d && last.no === n && (!hasOwn || n)) {
+        last.items.push(...items);
+        if (p.stated != null) last.stated = (last.stated || 0) + p.stated;
+      } else {
+        out.push(mkOrder(ctx, c, d, n, items, multi ? null : p.stated, []));
+      }
+    });
+    prev = meta;
+  });
+  return out;
+}
+function mkOrder(ctx, customer, date, no, items, stated, notes) {
+  return { id: uid(), file: ctx.file + (ctx.sheet && ctx.sheetCount > 1 ? " › " + ctx.sheet : ""), src: ctx.src, customer: customer || "", date: date || "", no: no || "", items, stated, notes: notes || [] };
+}
+
+/* ---------- file readers ---------- */
+function excelGrid(ws) {
+  if (!ws || !ws["!ref"]) return [];
+  const r = XLSX.utils.decode_range(ws["!ref"]);
+  const rows = [];
+  for (let R = r.s.r; R <= r.e.r; R++) {
+    const row = [];
+    for (let C = r.s.c; C <= r.e.c; C++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell) { row.push(""); continue; }
+      if (cell.t === "n" && cell.z && XLSX.SSF.is_date(cell.z)) {
+        const d = XLSX.SSF.parse_date_code(cell.v); row.push(d ? `${d.y}/${pad(d.m)}/${pad(d.d)}` : String(cell.v));
+      } else if (cell.t === "d") {
+        const d = new Date(cell.v); row.push(`${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`);
+      } else if (cell.t === "n") row.push(cell.v);
+      else row.push(norm(cell.w != null && cell.t !== "s" ? cell.w : cell.v));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+async function readExcel(file, src) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellNF: true, cellDates: false });
+  const out = [];
+  wb.SheetNames.forEach(sn => {
+    const rows = excelGrid(wb.Sheets[sn]);
+    out.push(...gridToOrders(rows, { file: file.name, sheet: sn, sheetCount: wb.SheetNames.length, src }));
+  });
+  return out;
+}
+function paraText(p) {
+  let s = "";
+  const walk = n => {
+    for (const c of n.children) {
+      const ln = c.localName;
+      if (ln === "Fallback" || ln === "pPr" || ln === "rPr" || ln === "delText" || ln === "instrText") continue;
+      if (ln === "t") s += c.textContent;
+      else if (ln === "tab") s += "\t";
+      else if (ln === "br" || ln === "cr") s += "\n";
+      else if (ln === "p") { s += "\n"; walk(c); }
+      else walk(c);
+    }
+  };
+  walk(p);
+  return norm(s);
+}
+function cellText(tc) {
+  const parts = [];
+  const walk = n => { for (const c of n.children) { if (c.localName === "p") parts.push(paraText(c)); else if (c.localName === "sdt" || c.localName === "sdtContent" || c.localName === "customXml") walk(c); } };
+  walk(tc);
+  return parts.join("\n").trim();
+}
+function walkBlock(el, rows) {
+  for (const c of el.children) {
+    const ln = c.localName;
+    if (ln === "p") {
+      paraText(c).split("\n").forEach(line => { if (line.trim()) rows.push(line.split(/\t+/).map(x => x.trim())); });
+    } else if (ln === "tbl") {
+      for (const tr of c.children) {
+        if (tr.localName !== "tr") continue;
+        const tcs = [...tr.children].filter(x => x.localName === "tc" || x.localName === "sdt");
+        const cells = tcs.map(x => x.localName === "sdt" ? (x.getElementsByTagName("w:tc")[0] || x) : x);
+        if (cells.some(tc => tc.getElementsByTagName("w:tbl").length)) cells.forEach(tc => walkBlock(tc, rows));
+        else rows.push(cells.map(cellText));
+      }
+    } else if (ln === "sdt" || ln === "sdtContent" || ln === "customXml" || ln === "body" || ln === "hdr" || ln === "txbxContent") {
+      walkBlock(c, rows);
+    }
+  }
+}
+async function readDocx(file, src) {
+  let zip;
+  try { zip = await JSZip.loadAsync(await file.arrayBuffer()); } catch (e) { throw new Error("不是有效的 .docx 檔"); }
+  const docXml = zip.file("word/document.xml");
+  if (!docXml) throw new Error("不是有效的 .docx 檔");
+  const parse = async f => new DOMParser().parseFromString(await f.async("string"), "application/xml");
+  const rows = [];
+  const hdrs = Object.keys(zip.files).filter(n => /^word\/header\d*\.xml$/.test(n)).sort();
+  for (const h of hdrs.slice(0, 1)) { const d = await parse(zip.file(h)); walkBlock(d.documentElement, rows); }
+  const doc = await parse(docXml);
+  const body = doc.getElementsByTagName("w:body")[0];
+  if (body) walkBlock(body, rows);
+  return gridToOrders(rows, { file: file.name, sheet: "", sheetCount: 1, src });
+}
+
+async function handleFiles(files) {
+  files = [...files];
+  if (!files.length) return;
+  const log = [];
+  const before = state.orders.length;
+  if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; openGroups.clear(); openOrders.clear(); }
+  let added = 0;
+  for (const f of files) {
+    const src = f.fsId ? "fs|" + f.fsId : f.name + "|" + f.size + "|" + f.lastModified;
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    if (state.seen.includes(src)) { log.push({ msg: `${f.name}：已經讀過，略過` }); continue; }
+    try {
+      let orders;
+      if (IMG_RE.test(f.name) || /^image\//.test(f.type || "")) {
+        $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("") + `<div>${esc(f.name)}：AI 辨識中…</div>`;
+        orders = await readPhoto(f, src);
+      } else if (ext === "docx") orders = await readDocx(f, src);
+      else if (["xlsx", "xlsm", "xls", "csv"].includes(ext)) orders = await readExcel(f, src);
+      else if (ext === "doc") throw new Error("舊版 .doc 無法讀取，請在 Word 另存成 .docx");
+      else throw new Error("不支援這種檔案");
+      if (!orders.length) throw new Error("沒有找到出貨單內容");
+      state.orders.push(...orders); state.seen.push(src); added += orders.length;
+      const nw = orders.filter(o => warnings(o).length).length;
+      log.push({ msg: `${f.name}：${orders.length} 張出貨單` + (nw ? `，${nw} 張需要確認` : "") });
+    } catch (e) { log.push({ err: true, msg: `${f.name}：${e.message || e}` }); }
+  }
+  $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("");
+  save(); render();
+  toast(added ? `新增 ${added} 張出貨單` : "沒有新增出貨單");
+}
+
+/* ---------- receivables ---------- */
+const specOf = it => [it.code, it.spec].filter(Boolean).join(" ");
+function orderTotal(o) { return o.items.reduce((s, it) => s + (Number(it.amount) || 0), 0); }
+/* 數量 × 單價 和金額相差超過 1 元（容許四捨五入）就算錯 */
+function expectedAmt(it) {
+  const q = Number(it.qty), p = Number(it.price);
+  if (it.qty == null || it.qty === "" || it.price == null || it.price === "" || !isFinite(q) || !isFinite(p)) return null;
+  return Math.round(q * p * 100) / 100;
+}
+function amtWrong(it) {
+  const e = expectedAmt(it);
+  if (e == null || it.amount == null || it.amount === "") return false;
+  return Math.abs(e - Number(it.amount)) > 1;
+}
+const badItems = o => o.items.filter(amtWrong).length;
+function warnings(o) {
+  const w = [];
+  const nb = badItems(o);
+  if (nb) w.push(`${nb} 項金額≠數量×單價`);
+  if (!o.customer) w.push("缺客戶");
+  if (!o.date) w.push("缺日期");
+  if (!o.items.length) w.push("沒有品項");
+  if (o.photo && !o.photoOk) w.push("照片待核對");
+  if (o.items.some(it => it.amount == null || it.amount === "")) w.push("品項缺金額");
+  if (o.stated && o.items.length && Math.abs(o.stated - orderTotal(o)) > 1) w.push(`合計不符（單上 ${fmt(o.stated)}）`);
+  (o.notes || []).forEach(n => { if (!w.includes(n) && !(n === "找不到品項表格" && w.includes("沒有品項"))) w.push(n); });
+  return w;
+}
+function period(date, cutoff) {
+  const [y, m, d] = date.split("-").map(Number);
+  let Y = y, M = m;
+  if (cutoff && d > cutoff) { M++; if (M > 12) { M = 1; Y++; } }
+  return { y: Y, m: M };
+}
+function periodRange(y, m, cutoff) {
+  if (!cutoff) { const last = new Date(Date.UTC(y, m, 0)).getUTCDate(); return [`${y}/${pad(m)}/01`, `${y}/${pad(m)}/${last}`]; }
+  let py = y, pm = m - 1; if (pm < 1) { pm = 12; py--; }
+  const lastPrev = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+  const sd = cutoff + 1 > lastPrev ? [y, m, 1] : [py, pm, cutoff + 1];
+  return [`${sd[0]}/${pad(sd[1])}/${pad(sd[2])}`, `${y}/${pad(m)}/${pad(Math.min(cutoff, new Date(Date.UTC(y, m, 0)).getUTCDate()))}`];
+}
+const sortOrders = (a, b) => (a.date || "9").localeCompare(b.date || "9") || String(a.no).localeCompare(String(b.no), "zh-Hant", { numeric: true });
+function buildGroups() {
+  const { cutoff, tax } = state.settings;
+  const map = new Map();
+  state.orders.forEach(o => {
+    if (!o.customer || !o.date) return;
+    const p = period(o.date, cutoff);
+    const key = o.customer + "|" + p.y + "-" + pad(p.m);
+    if (!map.has(key)) map.set(key, { key, customer: o.customer, y: p.y, m: p.m, orders: [] });
+    map.get(key).orders.push(o);
+  });
+  const groups = [...map.values()];
+  const years = new Set(groups.map(g => g.y));
+  const withYear = years.size > 1;
+  groups.forEach(g => {
+    g.orders.sort(sortOrders);
+    g.sub = g.orders.reduce((s, o) => s + orderTotal(o), 0);
+    g.tax = tax ? Math.round(g.sub * tax / 100) : 0;
+    g.total = g.sub + g.tax;
+    g.bad = g.orders.reduce((s, o) => s + badItems(o), 0);
+    g.name = `${g.customer}-${withYear ? g.y + "年" : ""}${g.m}月份應收款`;
+    g.range = periodRange(g.y, g.m, cutoff);
+  });
+  groups.sort((a, b) => a.customer.localeCompare(b.customer, "zh-Hant") || (a.y - b.y) || (a.m - b.m));
+  return groups;
+}
+
+/* ---------- rendering ---------- */
+function render() {
+  $("#exampleBanner").hidden = !state.example;
+  $("#cutoff").value = String(state.settings.cutoff);
+  $("#tax").value = String(state.settings.tax);
+  const groups = buildGroups();
+  renderAR(groups);
+  renderAliases();
+  renderOrders();
+  lockImported();
+  renderErp();
+  const has = groups.length > 0;
+  $("#dlAll").disabled = !has; $("#dlZip").disabled = !has;
+  const nbI = state.orders.reduce((s, o) => s + badItems(o), 0), nbO = state.orders.filter(o => badItems(o)).length;
+  const al = $("#amtAlert"); al.hidden = !nbI;
+  if (nbI) al.innerHTML = `<span>有 <b>${nbI}</b> 個品項的金額不等於數量×單價（${nbO} 張出貨單）。下載前請先確認。</span><button class="small" id="showBad">查看</button>`;
+}
+function renderAR(groups) {
+  const body = $("#arBody");
+  const custs = [...new Set(groups.map(g => g.customer))];
+  const total = groups.reduce((s, g) => s + g.total, 0);
+  const pending = state.orders.filter(o => !o.customer || !o.date).length;
+  $("#stats").innerHTML = `<span>客戶 <b class="num">${custs.length}</b></span><span>應收單 <b class="num">${groups.length}</b></span><span>應收合計 <b class="num">${fmt(total)}</b></span>` +
+    (pending ? `<span class="pill warn">${pending} 張出貨單缺客戶或日期，未列入</span>` : "");
+  if (!groups.length) { body.innerHTML = `<tr><td colspan="7" class="empty">上傳出貨單後，這裡會依客戶和月份列出應收帳款。</td></tr>`; return; }
+  let html = "";
+  custs.forEach(c => {
+    const gs = groups.filter(g => g.customer === c);
+    const ct = gs.reduce((s, g) => s + g.total, 0);
+    html += `<tr class="cust"><td colspan="5">${esc(c)}</td><td class="r num">${fmt(ct)}</td><td></td></tr>`;
+    gs.forEach(g => {
+      const open = openGroups.has(g.key);
+      html += `<tr class="grp" data-g="${esc(g.key)}"><td><span class="arname">${open ? "▾" : "▸"} ${esc(g.name)}</span>${g.bad ? ` <span class="pill warn">${g.bad} 項金額有誤</span>` : ""}</td><td class="num">${g.range[0]} ~ ${g.range[1].slice(5)}</td><td class="r num">${g.orders.length}</td><td class="r num">${fmt(g.sub)}</td><td class="r num">${g.tax ? fmt(g.tax) : "—"}</td><td class="r num"><b>${fmt(g.total)}</b></td><td style="white-space:nowrap"><button class="small" data-dl="${esc(g.key)}">下載</button>${ERP_MODE && erp.user && erpCan("files.write") ? ` <button class="small" data-fs="${esc(g.key)}">存檔</button>` : ""}</td></tr>`;
+      if (open) {
+        html += `<tr class="sub"><td colspan="7"><div class="inner"><table><thead><tr><th>日期</th><th>單號</th><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th></tr></thead><tbody>` +
+          g.orders.map(o => o.items.map((it, i) => `<tr><td class="num">${i ? "" : o.date.replace(/-/g, "/")}</td><td>${i ? "" : esc(o.no)}</td><td>${esc(it.name)}</td><td>${esc(specOf(it))}</td><td class="r num">${it.qty ?? ""}</td><td>${esc(it.unit)}</td><td class="r num">${fmt(it.price)}</td><td class="r num${amtWrong(it) ? " bad" : ""}"${amtWrong(it) ? ` title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${fmt(it.amount)}${amtWrong(it) ? ` <span class="pill warn">應為 ${fmt(expectedAmt(it))}</span>` : ""}</td></tr>`).join("") || `<tr><td class="num">${o.date.replace(/-/g, "/")}</td><td>${esc(o.no)}</td><td colspan="6" class="help">沒有品項</td></tr>`).join("") +
+          `</tbody></table></div></td></tr>`;
+      }
+    });
+  });
+  body.innerHTML = html;
+}
+function renderAliases() {
+  const counts = new Map();
+  state.orders.forEach(o => { if (o.customer) counts.set(o.customer, (counts.get(o.customer) || 0) + 1); });
+  const names = [...counts.keys()].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  // ERP 裡的客戶也列進輸入建議（打幾個字就會跳出完整名稱）
+  const all = new Set([...names, ...(ERP_MODE && erp.user ? erp.customers.map(c => c.name) : [])]);
+  $("#custList").innerHTML = [...all].map(n => `<option value="${esc(n)}"></option>`).join("");
+  $("#aliases").innerHTML = names.length ? names.map((n, i) => `<div class="alias"><input type="text" id="alias-${i}" data-alias="${esc(n)}" value="${esc(n)}" list="custList" aria-label="客戶名稱 ${esc(n)}"><span>${counts.get(n)} 張</span></div>`).join("") : `<div class="help">還沒有客戶。</div>`;
+}
+function renderOrders() {
+  const q = squash($("#q").value).toLowerCase();
+  const only = $("#onlyWarn").checked;
+  let list = state.orders.slice().sort((a, b) => (a.customer || "￿").localeCompare(b.customer || "￿", "zh-Hant") || sortOrders(a, b));
+  const nWarn = state.orders.filter(o => warnings(o).length).length;
+  $("#ordStats").innerHTML = `<span>共 <b class="num">${state.orders.length}</b> 張</span>` + (nWarn ? `<span class="pill warn">${nWarn} 張需確認</span>` : state.orders.length ? `<span class="pill ok">全部讀取完整</span>` : "");
+  if (only) list = list.filter(o => warnings(o).length);
+  if (q) list = list.filter(o => squash([o.customer, o.no, o.file, o.date, ...o.items.map(i => i.name + specOf(i))].join(" ")).toLowerCase().includes(q));
+  const body = $("#ordBody");
+  if (!list.length) { body.innerHTML = `<tr><td colspan="8" class="empty">${state.orders.length ? "沒有符合條件的出貨單。" : "還沒有出貨單。"}</td></tr>`; return; }
+  body.innerHTML = list.map(o => {
+    // 照片匯入、還沒核對的單自動展開（手機上「品項」按鈕在表格最右邊，不好找）
+    const w = warnings(o); const open = openOrders.has(o.id) || (!!o.photo && !o.photoOk && !o.erp && !closedOrders.has(o.id));
+    let h = `<tr data-o="${o.id}"${o.erp ? ' class="locked"' : ""}>
+      <td style="min-width:170px"><input type="text" id="c-${o.id}" data-f="customer" value="${esc(o.customer)}" list="custList" placeholder="輸入客戶名稱" aria-label="客戶"></td>
+      <td style="min-width:140px"><input type="date" id="d-${o.id}" data-f="date" value="${esc(o.date)}" aria-label="出貨日期"></td>
+      <td style="min-width:110px"><input type="text" id="n-${o.id}" data-f="no" value="${esc(o.no)}" aria-label="單號"></td>
+      <td class="r num">${o.items.length}</td>
+      <td class="r num">${fmt(orderTotal(o))}</td>
+      <td><div class="pills">${state.example ? `<span class="pill ex">範例</span>` : ""}${o.erp ? `<a class="pill ok" href="/#/orders/${o.erp.id}" title="已匯入 ERP">ERP ${esc(o.erp.order_no)}</a>` : ""}${o.erpError ? `<span class="pill warn" title="${esc(o.erpError)}">ERP 匯入失敗</span>` : ""}${w.length ? w.map(x => `<span class="pill warn">${esc(x)}</span>`).join("") : `<span class="pill ok">完整</span>`}</div></td>
+      <td><div class="src" title="${esc(o.file)}">${esc(o.file)}</div></td>
+      <td style="white-space:nowrap"><button class="link" data-act="toggle">${open ? "收合" : "品項"}</button><button class="link danger" data-act="del">刪除</button></td></tr>`;
+    if (open) {
+      h += `<tr class="sub" data-o="${o.id}"><td colspan="8"><div class="inner">${o.photo ? photoPanel(o) : ""}<table><thead><tr><th>品名</th><th>規格</th><th class="r">數量</th><th>單位</th><th class="r">單價</th><th class="r">金額</th><th>備註</th><th></th></tr></thead><tbody>` +
+        o.items.map((it, i) => `<tr data-i="${i}">
+          <td style="min-width:180px"><input type="text" id="i-${o.id}-${i}-name" data-k="name" value="${esc(it.name)}"></td>
+          <td style="min-width:110px"><input type="text" id="i-${o.id}-${i}-spec" data-k="spec" value="${esc(it.spec)}"></td>
+          <td style="width:80px"><input type="number" id="i-${o.id}-${i}-qty" data-k="qty" value="${it.qty ?? ""}" step="any" class="num"></td>
+          <td style="width:64px"><input type="text" id="i-${o.id}-${i}-unit" data-k="unit" value="${esc(it.unit)}"></td>
+          <td style="width:100px"><input type="number" id="i-${o.id}-${i}-price" data-k="price" value="${it.price ?? ""}" step="any" class="num"></td>
+          <td style="width:130px"><input type="number" id="i-${o.id}-${i}-amount" data-k="amount" value="${it.amount ?? ""}" step="any" class="num${amtWrong(it) ? " badin" : ""}"${amtWrong(it) ? ` aria-invalid="true" title="數量×單價＝${fmt(expectedAmt(it))}"` : ""}>${amtWrong(it) ? `<button class="link" data-act="fixAmt">改成 ${fmt(expectedAmt(it))}</button>` : ""}</td>
+          <td style="min-width:120px"><input type="text" id="i-${o.id}-${i}-note" data-k="note" value="${esc(it.note)}"></td>
+          <td><button class="link danger" data-act="delItem" aria-label="刪除品項">×</button></td></tr>`).join("") +
+        `</tbody></table><div class="btns" style="margin-top:6px"><button class="small" data-act="addItem">新增品項</button></div></div></td></tr>`;
+    }
+    return h;
+  }).join("");
+  body.querySelectorAll("img[data-photo]").forEach(fillPhoto);
+}
+
+function lockImported() {
+  state.orders.filter(o => o.erp).forEach(o => document.querySelectorAll(`#ordBody tr[data-o="${o.id}"]`).forEach(tr =>
+    tr.querySelectorAll("input, [data-act=addItem], [data-act=delItem], [data-act=fixAmt]").forEach(el => { el.disabled = true; el.title = "已匯入 ERP，這裡修改不會改到 ERP"; })));
+}
+
+/* ---------- excel export ---------- */
+function serial(date) { const [y, m, d] = date.split("-").map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; }
+const MONEY = "#,##0";
+function setCell(ws, r, c, cell) { ws[XLSX.utils.encode_cell({ r, c })] = cell; }
+function sheetFromRows(rows) {
+  const ws = {}; let maxC = 0;
+  rows.forEach((row, r) => row.forEach((v, c) => {
+    if (v == null || v === "") return;
+    maxC = Math.max(maxC, c);
+    if (typeof v === "object") setCell(ws, r, c, v);
+    else if (typeof v === "number") setCell(ws, r, c, { t: "n", v });
+    else setCell(ws, r, c, { t: "s", v: String(v) });
+  }));
+  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(rows.length - 1, 0), c: maxC } });
+  return ws;
+}
+const dcell = d => d ? { t: "n", v: serial(d), z: "yyyy/mm/dd" } : "";
+const mcell = n => (n == null || n === "") ? "" : { t: "n", v: Number(n), z: MONEY };
+function groupSheet(g) {
+  const tax = state.settings.tax;
+  const rows = [
+    [g.name],
+    ["客戶", g.customer, "", "", "帳款月份", `${g.y}年${g.m}月`],
+    ["計算期間", `${g.range[0]} ~ ${g.range[1]}`, "", "", "出貨單數", g.orders.length],
+    [],
+    ["日期", "出貨單號", "品名", "規格", "數量", "單位", "單價", "金額", "備註"],
+  ];
+  const first = rows.length + 1;
+  g.orders.forEach(o => {
+    if (!o.items.length) rows.push([dcell(o.date), o.no, "（沒有品項）"]);
+    o.items.forEach(it => rows.push([dcell(o.date), o.no, it.name, specOf(it), it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note]));
+  });
+  const last = rows.length;
+  rows.push([]);
+  const subRow = rows.length + 1;
+  rows.push(["", "", "", "", "", "", tax ? "未稅合計" : "應收合計", { t: "n", v: g.sub, f: `SUM(H${first}:H${last})`, z: MONEY }]);
+  if (tax) {
+    rows.push(["", "", "", "", "", "", `營業稅 ${tax}%`, { t: "n", v: g.tax, f: `ROUND(H${subRow}*${tax / 100},0)`, z: MONEY }]);
+    rows.push(["", "", "", "", "", "", "應收合計", { t: "n", v: g.total, f: `H${subRow}+H${subRow + 1}`, z: MONEY }]);
+  }
+  const ws = sheetFromRows(rows);
+  ws["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 8 }, { wch: 7 }, { wch: 11 }, { wch: 13 }, { wch: 22 }];
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }];
+  return ws;
+}
+function sheetName(name, used) {
+  let n = name.replace(/[\[\]:*?\/\\]/g, "");
+  if (n.length > 31) { const tail = n.slice(n.lastIndexOf("-")); n = n.slice(0, 31 - tail.length) + tail; if (n.length > 31) n = n.slice(0, 31); }
+  let base = n, k = 2;
+  while (used.has(n.toLowerCase())) { const suf = `(${k++})`; n = base.slice(0, 31 - suf.length) + suf; }
+  used.add(n.toLowerCase());
+  return n;
+}
+function summarySheet(groups) {
+  const tax = state.settings.tax;
+  const rows = [["應收帳款總表"], [`結帳日：${state.settings.cutoff ? "每月 " + state.settings.cutoff + " 日" : "月底"}　營業稅：${tax ? "外加 " + tax + "%" : "不計"}`], [],
+    ["客戶", "帳款月份", "應收單名稱", "計算期間", "出貨單數", "未稅金額", "營業稅", "應收金額", "金額有誤品項"]];
+  const custs = [...new Set(groups.map(g => g.customer))];
+  let gs = 0, gt = 0, gx = 0, gn = 0;
+  custs.forEach(c => {
+    const list = groups.filter(g => g.customer === c);
+    list.forEach(g => rows.push([g.customer, `${g.y}/${pad(g.m)}`, g.name, `${g.range[0]} ~ ${g.range[1]}`, g.orders.length, mcell(g.sub), mcell(g.tax), mcell(g.total), g.bad || ""]));
+    const s = list.reduce((a, g) => a + g.sub, 0), x = list.reduce((a, g) => a + g.tax, 0), t = list.reduce((a, g) => a + g.total, 0), n = list.reduce((a, g) => a + g.orders.length, 0);
+    if (list.length > 1) rows.push([`${c} 小計`, "", "", "", n, mcell(s), mcell(x), mcell(t)]);
+    gs += s; gx += x; gt += t; gn += n;
+  });
+  rows.push([], ["總計", "", "", "", gn, mcell(gs), mcell(gx), mcell(gt)]);
+  const ws = sheetFromRows(rows);
+  ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 30 }, { wch: 24 }, { wch: 9 }, { wch: 13 }, { wch: 11 }, { wch: 13 }];
+  return ws;
+}
+function detailSheet(groups) {
+  const rows = [["客戶", "帳款月份", "日期", "出貨單號", "品名", "規格", "數量", "單位", "單價", "金額", "備註", "來源檔案", "檢查"]];
+  groups.forEach(g => g.orders.forEach(o => {
+    if (!o.items.length) rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, "（沒有品項）", "", "", "", "", "", "", o.file]);
+    o.items.forEach(it => rows.push([g.customer, `${g.y}/${pad(g.m)}`, dcell(o.date), o.no, it.name, specOf(it), it.qty ?? "", it.unit, mcell(it.price), mcell(it.amount), it.note, o.file, amtWrong(it) ? `金額不符：數量×單價＝${fmt(expectedAmt(it))}` : ""]));
+  }));
+  const ws = sheetFromRows(rows);
+  ws["!cols"] = [{ wch: 18 }, { wch: 9 }, { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 7 }, { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 12 } }) };
+  return ws;
+}
+function wbBytes(wb) { return new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array", compression: true })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }); }
+function groupWorkbook(gs) {
+  const wb = XLSX.utils.book_new(); const used = new Set();
+  gs.forEach(g => XLSX.utils.book_append_sheet(wb, groupSheet(g), sheetName(g.name, used)));
+  return wb;
+}
+const dlReady = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+async function saveFile(filename, blob) {
+  const dl = await dlReady;
+  if (dl) {
+    try { await dl.save({ filename, data: blob }); toast("已下載 " + filename); }
+    catch (e) { if (e && e.code === "declined") return; if (e && e.code === "rate_limited") toast("請稍候再試一次"); else toast("無法下載：" + (e && e.message || e)); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast("已下載 " + filename);
+}
+const safeFile = s => s.replace(/[\\/:*?"<>|]/g, "_");
+function rangeLabel(groups) {
+  const ym = groups.map(g => g.y * 100 + g.m); const a = Math.min(...ym), b = Math.max(...ym);
+  const f = v => `${Math.floor(v / 100)}${pad(v % 100)}`;
+  return a === b ? f(a) : `${f(a)}-${f(b)}`;
+}
+function allWorkbook() {
+  const groups = buildGroups(); if (!groups.length) return null;
+  const wb = XLSX.utils.book_new(); const used = new Set(["應收總表", "出貨明細"]);
+  XLSX.utils.book_append_sheet(wb, summarySheet(groups), "應收總表");
+  XLSX.utils.book_append_sheet(wb, detailSheet(groups), "出貨明細");
+  groups.forEach(g => XLSX.utils.book_append_sheet(wb, groupSheet(g), sheetName(g.name, used)));
+  return { name: `應收帳款彙整_${rangeLabel(groups)}.xlsx`, blob: wbBytes(wb) };
+}
+async function downloadAll() {
+  const f = allWorkbook(); if (f) await saveFile(f.name, f.blob);
+}
+async function downloadZip() {
+  const groups = buildGroups(); if (!groups.length) return;
+  const zip = new JSZip(); const names = new Set();
+  groups.forEach(g => { let n = safeFile(g.name), k = 2; while (names.has(n)) n = safeFile(g.name) + `(${k++})`; names.add(n); zip.file(n + ".xlsx", wbBytes(groupWorkbook([g]))); });
+  await saveFile(`應收單_${rangeLabel(groups)}.zip`, await zip.generateAsync({ type: "blob" }));
+}
+async function downloadGroup(key) {
+  const g = buildGroups().find(x => x.key === key); if (!g) return;
+  await saveFile(safeFile(g.name) + ".xlsx", wbBytes(groupWorkbook([g])));
+}
+
+/* ---------- events ---------- */
+const cut = $("#cutoff");
+cut.innerHTML = `<option value="0">月底（依出貨日期的月份）</option>` + Array.from({ length: 28 }, (_, i) => `<option value="${i + 1}">每月 ${i + 1} 日（${i + 2 > 28 ? "隔日" : i + 2 + " 日"}起算下個月）</option>`).join("");
+cut.addEventListener("change", () => { state.settings.cutoff = +cut.value; save(); render(); });
+$("#tax").addEventListener("change", e => { state.settings.tax = +e.target.value; save(); render(); });
+const drop = $("#drop"), fileIn = $("#file");
+drop.addEventListener("click", () => fileIn.click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } });
+fileIn.addEventListener("change", () => { handleFiles(fileIn.files); fileIn.value = ""; });
+["dragenter", "dragover"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === document.documentElement) drop.classList.remove("over"); }));
+document.addEventListener("drop", e => { if (e.dataTransfer && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+$("#dlAll").addEventListener("click", downloadAll);
+$("#dlZip").addEventListener("click", downloadZip);
+$("#clearExample").addEventListener("click", () => { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; save(); render(); });
+$("#clearAll").addEventListener("click", () => { $("#confirmClear").hidden = false; });
+$("#clearNo").addEventListener("click", () => { $("#confirmClear").hidden = true; });
+$("#clearYes").addEventListener("click", () => { photoClear(); state.orders = []; state.seen = []; state.example = false; state.dismissedExample = true; $("#confirmClear").hidden = true; $("#log").innerHTML = ""; save(); render(); toast("已清除"); });
+$("#addOrder").addEventListener("click", () => {
+  if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; }
+  const o = { id: uid(), file: "手動新增", src: "", customer: "", date: new Date().toISOString().slice(0, 10), no: "", items: [{ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }], stated: null, notes: [] };
+  state.orders.push(o); openOrders.add(o.id); $("#onlyWarn").checked = false; $("#q").value = ""; save(); render();
+  setTimeout(() => { const el = document.getElementById("c-" + o.id); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } }, 30);
+});
+$("#q").addEventListener("input", () => { renderOrders(); lockImported(); });
+$("#amtAlert").addEventListener("click", e => {
+  if (!e.target.closest("#showBad")) return;
+  state.orders.forEach(o => { if (badItems(o)) openOrders.add(o.id); });
+  $("#onlyWarn").checked = true; $("#q").value = ""; renderOrders(); lockImported();
+  $("#ordBody").scrollIntoView({ block: "start", behavior: "smooth" });
+});
+$("#onlyWarn").addEventListener("change", () => { renderOrders(); lockImported(); });
+$("#arBody").addEventListener("click", e => {
+  if (e.target.closest("[data-fs]")) return;
+  const b = e.target.closest("[data-dl]"); if (b) { e.stopPropagation(); downloadGroup(b.dataset.dl); return; }
+  const tr = e.target.closest("tr.grp"); if (!tr) return;
+  const k = tr.dataset.g; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); render();
+});
+$("#aliases").addEventListener("change", e => {
+  const inp = e.target.closest("[data-alias]"); if (!inp) return;
+  const from = inp.dataset.alias, to = cleanCustomer(inp.value);
+  if (!to || to === from) { inp.value = from; return; }
+  let n = 0; state.orders.forEach(o => { if (o.customer === from) { o.customer = to; n++; } });
+  save(); render(); toast(`已把 ${n} 張「${from}」改成「${to}」`);
+});
+const ordBody = $("#ordBody");
+const findOrder = el => { const tr = el.closest("tr[data-o]"); return tr && state.orders.find(o => o.id === tr.dataset.o); };
+ordBody.addEventListener("change", e => {
+  const o = findOrder(e.target); if (!o) return;
+  const f = e.target.dataset.f, k = e.target.dataset.k;
+  if (f) { o[f] = f === "customer" ? cleanCustomer(e.target.value) : e.target.value.trim(); if (f !== "no") o.notes = (o.notes || []).filter(n => n !== "找不到品項表格"); }
+  if (k) {
+    const i = +e.target.closest("tr[data-i]").dataset.i, it = o.items[i];
+    if (["qty", "price", "amount"].includes(k)) {
+      it[k] = e.target.value === "" ? null : parseFloat(e.target.value);
+      if (k !== "amount" && it.qty != null && it.price != null) it.amount = Math.round(it.qty * it.price * 100) / 100;
+    } else it[k] = e.target.value;
+    o.stated = null;
+  }
+  save(); render();
+});
+ordBody.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const o = findOrder(b); if (!o) return;
+  const act = b.dataset.act;
+  if (act === "toggle") {
+    const wasOpen = !!b.closest("tr").nextElementSibling?.classList.contains("sub");
+    if (wasOpen) { openOrders.delete(o.id); closedOrders.add(o.id); } else { openOrders.add(o.id); closedOrders.delete(o.id); }
+    renderOrders(); lockImported(); return;
+  }
+  if (act === "del") {
+    if (b.dataset.sure) { state.orders = state.orders.filter(x => x !== o); dropUnusedPhotos(); save(); render(); toast("已刪除出貨單"); }
+    else { b.dataset.sure = "1"; b.textContent = "確定刪除？"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "刪除"; } }, 3000); }
+    return;
+  }
+  if (act === "pickCust") { o.customer = b.dataset.name; o.custCandidates = []; save(); render(); toast(`客戶改成「${o.customer}」`); return; }
+  if (act === "photoOk") { o.photoOk = true; save(); render(); toast("已核對"); return; }
+  if (act === "photoBig") { b.classList.toggle("big"); return; }
+  if (act === "fixAmt") { const it = o.items[+b.closest("tr[data-i]").dataset.i]; it.amount = expectedAmt(it); o.stated = null; save(); render(); toast("已改成數量×單價"); return; }
+  if (act === "addItem") { o.items.push({ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }); o.stated = null; }
+  if (act === "delItem") { o.items.splice(+b.closest("tr[data-i]").dataset.i, 1); o.stated = null; }
+  save(); render();
+});
+
+/* ---------- 出貨單照片：AI 辨識（ERP 的 /api/ai），照片存在這台裝置的 IndexedDB，匯入時附在出貨紀錄 ---------- */
+const IMG_RE = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
+const photoCache = new Map();
+let photoDbP = null;
+function photoDb() {
+  if (!photoDbP) photoDbP = new Promise((ok, bad) => {
+    try { const r = indexedDB.open("shipping-photos", 1); r.onupgradeneeded = () => r.result.createObjectStore("p"); r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); }
+    catch (e) { bad(e); }
+  }).catch(() => null);
+  return photoDbP;
+}
+async function photoTx(mode, fn) {
+  const d = await photoDb(); if (!d) return undefined;
+  return new Promise(ok => { try { const t = d.transaction("p", mode); const r = fn(t.objectStore("p")); t.oncomplete = () => ok(r && r.result); t.onerror = t.onabort = () => ok(undefined); } catch (e) { ok(undefined); } });
+}
+async function photoPut(key, url) { photoCache.set(key, url); await photoTx("readwrite", s => s.put(url, key)); }
+async function photoGet(key) { if (!photoCache.has(key)) { const v = await photoTx("readonly", s => s.get(key)); if (v) photoCache.set(key, v); } return photoCache.get(key) || ""; }
+function photoClear() { photoCache.clear(); photoTx("readwrite", s => s.clear()); }
+function dropUnusedPhotos() {
+  const used = new Set(state.orders.map(o => o.photo).filter(Boolean));
+  [...photoCache.keys()].forEach(k => { if (!used.has(k)) photoCache.delete(k); });
+  photoTx("readwrite", s => { const r = s.getAllKeys(); r.onsuccess = () => r.result.forEach(k => { if (!used.has(k)) s.delete(k); }); return r; });
+}
+async function fillPhoto(img) {
+  const url = await photoGet(img.dataset.photo);
+  if (url) img.src = url; else img.replaceWith(Object.assign(document.createElement("div"), { className: "help", textContent: "這台裝置上找不到照片（可能清除過瀏覽器資料），匯入時不會附照片。" }));
+}
+function photoPanel(o) {
+  const d = o.doubts || [];
+  return `<div class="slip"><img data-photo="${esc(o.photo)}" data-act="photoBig" alt="出貨單照片" title="點一下放大／縮小">
+    <div class="doubts">
+    <label class="custedit"><b>客戶</b><input type="text" id="pc-${o.id}" data-f="customer" value="${esc(o.customer)}" list="custList" placeholder="輸入客戶名稱" aria-label="客戶名稱"></label>
+    ${o.custCandidates && o.custCandidates.length && !o.erp ? `<div><b>可能是：</b><span class="btns">${o.custCandidates.map(n => `<button class="small" data-act="pickCust" data-name="${esc(n.replace(/（.*）$/, ""))}">${esc(n)}</button>`).join("")}</span></div>` : ""}
+    ${o.slipNote ? `<div><b>單上備註：</b>${esc(o.slipNote)}（匯入時寫進 ERP 訂單備註）</div>` : ""}${d.length ? `<div><b>AI 提醒要確認：</b><ul>${d.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : `<div class="help">對照片檢查客戶、日期、單號和每個品項的數量、單價。</div>`}
+    ${o.erp ? "" : o.photoOk ? `<div><span class="pill ok">已核對照片</span></div>` : `<div class="btns"><button class="small primary" data-act="photoOk">已對照片核對，內容正確</button></div>`}</div></div>`;
+}
+// 縮小照片：長邊 max 像素、JPEG（iPhone HEIC 只有 Safari 讀得到）
+async function shrinkImage(file, max, quality) {
+  let src, w, h;
+  try { src = await createImageBitmap(file, { imageOrientation: "from-image" }); w = src.width; h = src.height; }
+  catch (e) {
+    const url = URL.createObjectURL(file);
+    try { src = await new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = url; }); w = src.naturalWidth; h = src.naturalHeight; }
+    catch (e2) { throw new Error("無法讀取這張照片（HEIC 請改用 JPG，或直接按「拍照」）"); }
+    finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  }
+  const k = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", quality);
+}
+const r2 = n => Math.round(n * 100) / 100;
+async function readPhoto(file, src) {
+  if (!ERP_MODE) throw new Error("照片辨識要在牙材 ERP 裡（銷貨 → 出貨單彙整）使用");
+  if (!erp.user) throw new Error("請先登入牙材 ERP 再上傳照片");
+  if (!erpCan("ai")) throw new Error("你的角色沒有 AI 辨識權限，請管理者協助");
+  const forAi = await shrinkImage(file, 2000, 0.85);
+  let keep = await shrinkImage(file, 1400, 0.72);
+  if (keep.length > 1_400_000) keep = await shrinkImage(file, 1000, 0.6);
+  let r;
+  try { r = await erpApi("/api/ai", { method: "POST", body: { mode: "shipping_slip", image: forAi } }); }
+  catch (e) { throw new Error(e.status === 401 ? "ERP 登入已過期，請重新登入" : e.message); }
+  const slips = (r.slips || []).filter(s => s.customer || s.items.length);
+  if (!slips.length) throw new Error((r.problems || []).join("；") || "照片裡沒有讀到出貨單");
+  const key = "p" + uid();
+  await photoPut(key, keep);
+  return slips.map((s, k) => {
+    const doubts = [...(s.doubts || []), ...(k ? [] : r.problems || [])];
+    if (s.customer_how) doubts.unshift(s.customer_how);
+    if (s.customer_candidates && s.customer_candidates.length) doubts.unshift(`客戶「${s.customer}」看不太清楚，請從下面的候選選一個，或直接改客戶名稱`);
+    if (s.tax_included && s.total != null) doubts.push(`單上合計 ${fmt(s.total)} 含稅，品項金額以未稅計`);
+    s.items.filter(it => it.erp_price).forEach(it => doubts.push(`「${it.name}」單上沒寫單價，先帶入 ERP 定價 ${fmt(it.price)}`));
+    const noPrice = s.items.filter(it => it.price == null && it.amount == null).length;
+    if (noPrice) doubts.push(`${noPrice} 個品項單上沒寫單價，請在下方填入後再匯入`);
+    const items = s.items.map(it => {
+      let price = it.price, amount = it.amount;
+      if (price == null && amount != null && it.qty) price = r2(amount / it.qty);
+      if (amount == null && price != null) amount = r2(it.qty * price);
+      return { code: it.code || "", name: it.name, spec: it.spec || "", qty: it.qty, unit: it.unit || "", price, amount,
+        note: [it.note, it.written ? `單上寫「${it.written}」` : ""].filter(Boolean).join("；") };
+    });
+    const o = mkOrder({ file: file.name + (slips.length > 1 ? `（第 ${k + 1} 張）` : "") + "・照片", src }, cleanCustomer(s.customer), s.date, s.no, items, s.tax_included ? null : s.total, []);
+    o.photo = key; o.doubts = doubts.slice(0, 14); o.photoOk = false; o.slipNote = s.note || "";
+    o.custCandidates = s.customer_candidates || [];
+    // 印章代碼對到 ERP 客戶：直接設定「對應 ERP 客戶」
+    if (s.customer_id && o.customer) { state.erpMap = state.erpMap || {}; state.erpMap[o.customer] = "id:" + s.customer_id; }
+    openOrders.add(o.id);
+    return o;
+  });
+}
+$("#photoCam").addEventListener("click", () => $("#photoCamIn").click());
+$("#photoPick").addEventListener("click", () => $("#photoIn").click());
+["#photoCamIn", "#photoIn"].forEach(s => $(s).addEventListener("change", e => { handleFiles(e.target.files); e.target.value = ""; }));
+
+/* ---------- ERP（頁面放在牙材 ERP 網站裡、有 <meta name="erp"> 時才啟用） ---------- */
+const ERP_MODE = !!document.querySelector('meta[name="erp"]');
+const LOGIN_URL = "/?back=" + encodeURIComponent(location.pathname) + "#/login";
+const erp = { ready: false, user: null, perms: [], customers: [], busy: false, result: null, error: "" };
+const erpCan = p => erp.perms.includes("*") || erp.perms.includes(p);
+const erpKey = s => norm(s).replace(/[\s()\[\]【】\-_/、,，。:：]+/g, "").toLowerCase();
+async function erpApi(path, opts = {}) {
+  const res = await fetch(path, { credentials: "same-origin", method: opts.method || "GET",
+    headers: opts.raw ? { "Content-Type": "application/octet-stream" } : opts.body ? { "Content-Type": "application/json" } : {},
+    body: opts.raw || (opts.body ? JSON.stringify(opts.body) : undefined) });
+  let data = {}; try { data = await res.json(); } catch (e) {}
+  if (!res.ok) { const err = new Error(data.error || `ERP 回應錯誤（${res.status}）`); err.status = res.status; throw err; }
+  return data;
+}
+async function erpInit() {
+  try {
+    const me = await erpApi("/api/auth");
+    erp.user = me.user; erp.perms = me.perms || [];
+    if (erp.user) erp.customers = await erpApi("/api/records?type=customers");
+  } catch (e) { erp.error = e.message; }
+  erp.ready = true;
+  render();
+  // 從檔案網站按「用出貨單彙整開啟」過來：/tools/shipping.html?files=1,2,3
+  const ids = (new URLSearchParams(location.search).get("files") || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (erp.user && ids.length) { history.replaceState(null, "", location.pathname); await loadFromFileSite(ids); }
+}
+// 出貨單上的客戶名稱 → ERP 客戶：完全相同（忽略空白、括號）自動對上；只有一個名稱互相包含的當作建議，要人確認
+function erpAutoMatch(name) {
+  const k = erpKey(name);
+  const exact = erp.customers.find(c => erpKey(c.name) === k);
+  if (exact) return { value: "id:" + exact.id, how: "auto" };
+  const near = k.length >= 2 ? erp.customers.filter(c => { const ck = erpKey(c.name); return ck.length >= 2 && (ck.includes(k) || k.includes(ck)); }) : [];
+  if (near.length === 1) return { value: "id:" + near[0].id, how: "suggest" };
+  return { value: "", how: "none" };
+}
+function erpMapping(name) {
+  const saved = (state.erpMap || {})[name];
+  if (saved === "new" || (saved && erp.customers.some(c => "id:" + c.id === saved))) return { value: saved, how: "manual" };
+  return erpAutoMatch(name);
+}
+function erpProblems(o) {
+  const p = warnings(o).slice();
+  o.items.forEach(it => {
+    if (!(Number(it.qty) > 0)) p.push(`「${it.name || "品項"}」數量要大於 0`);
+    else if (it.price == null || it.price === "") p.push(`「${it.name || "品項"}」缺單價`);
+  });
+  return [...new Set(p)];
+}
+function erpReady() { return state.example ? [] : state.orders.filter(o => !o.erp && !erpProblems(o).length); }
+function renderErp() {
+  if (!ERP_MODE) return;
+  renderPick();
+  $("#erpPanel").hidden = false;
+  $("#privacy").textContent = "Word／Excel 在瀏覽器裡讀取，照片送到 ERP 用 AI 辨識；按「匯入 ERP」才會建立訂單";
+  // 拍照區在 ERP 裡一律顯示；還沒登入或沒有 AI 權限時，按鈕換成說明
+  const canPhoto = !!erp.user && erpCan("ai");
+  $("#photoBox").hidden = false;
+  $("#photoBtns").hidden = !canPhoto;
+  const pm = $("#photoMsg");
+  pm.hidden = canPhoto;
+  pm.innerHTML = canPhoto ? "" : !erp.ready ? "正在連線 ERP…" : !erp.user
+    ? `要先登入牙材 ERP 才能拍照或上傳圖片。<div class="btns" style="margin-top:6px"><a class="btnlink" href="${LOGIN_URL}">登入牙材 ERP</a></div>`
+    : "你的角色沒有 AI 辨識權限，不能用照片匯入，請管理者在「使用者與角色」協助。";
+  fileIn.accept = canPhoto ? ".docx,.doc,.xlsx,.xlsm,.xls,.csv,image/*" : ".docx,.doc,.xlsx,.xlsm,.xls,.csv";
+  $("#dropTypes").textContent = canPhoto ? "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV 和出貨單照片，可一次選多個檔案" : "支援 Word（.docx）、Excel（.xlsx、.xls）、CSV，可一次選多個檔案";
+  const u = $("#erpUser"); u.hidden = false;
+  u.innerHTML = erp.user ? `牙材 ERP · ${esc(erp.user.name || erp.user.email)}　<a href="/#/dashboard">回 ERP</a>` : `<a href="${LOGIN_URL}">登入牙材 ERP</a>`;
+  const body = $("#erpBody");
+  if (!erp.ready) { body.innerHTML = `<p class="help">正在連線 ERP…</p>`; $("#erpStats").innerHTML = ""; return; }
+  if (!erp.user) { body.innerHTML = `<div class="alert"><span>${erp.error ? esc(erp.error) + "。" : ""}還沒登入 ERP。請先<a href="${LOGIN_URL}">登入</a>，登入後會回到這一頁。</span></div>`; return; }
+  if (!["orders.write", "shipments.write", "products.write"].every(erpCan)) { body.innerHTML = `<p class="help">你的角色不能匯入出貨單（需要訂貨單、出貨和產品的權限），請管理者協助。</p>`; return; }
+  const ready = erpReady();
+  const done = state.orders.filter(o => o.erp).length;
+  const blocked = state.example ? 0 : state.orders.filter(o => !o.erp && erpProblems(o).length).length;
+  $("#erpStats").innerHTML = `<span>可以匯入 <b class="num">${ready.length}</b> 張</span>` + (blocked ? `<span class="pill warn">${blocked} 張需確認，不會匯入</span>` : "") + (done ? `<span class="pill ok">已匯入 ${done} 張</span>` : "");
+  const names = [...new Set(ready.map(o => o.customer))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  const canNew = erpCan("customers.write");
+  const custOpts = erp.customers.slice().sort((a, b) => a.name.localeCompare(b.name, "zh-Hant")).map(c => `<option value="id:${c.id}">${esc(c.name)}</option>`).join("");
+  const unmapped = names.filter(n => !erpMapping(n).value);
+  let html = `<div class="erp">
+    <p class="help">每張出貨單會在 ERP 建成一張「已出貨」的訂單和出貨紀錄（拍照匯入的附上照片）：日期用出貨日期、扣庫存，ERP 找不到的產品會自動新增到產品主檔（庫存從 0 起算）。
+    匯入後在 ERP 的應收帳款、月對帳單和收款沖銷都看得到。同一張出貨單（同客戶、同單號）不會重複匯入。
+    ${state.settings.tax ? "營業稅設定為外加 5%，訂單會標記「開發票」並加 5% 稅額。" : "營業稅設定為不計，訂單不加稅額；要開發票請把上方營業稅改成外加 5%。"}</p>`;
+  if (state.example) html += `<p class="help">目前是範例資料，不會匯入。請上傳你的出貨單。</p>`;
+  if (names.length) {
+    html += `<div class="tablebox"><table><thead><tr><th>出貨單上的客戶</th><th>對應 ERP 客戶</th><th></th></tr></thead><tbody>` +
+      names.map((n, i) => {
+        const m = erpMapping(n);
+        const pill = m.how === "auto" ? `<span class="pill ok">已自動對應</span>` : m.how === "suggest" ? `<span class="pill warn">名稱相近，請確認</span>` : m.value ? "" : `<span class="pill warn">請選擇</span>`;
+        return `<tr><td>${esc(n)}</td><td><select id="erpmap-${i}" data-erpmap="${esc(n)}" aria-label="${esc(n)} 對應的 ERP 客戶">
+          <option value="">請選擇客戶…</option>${canNew ? `<option value="new">＋ 新增客戶「${esc(n)}」</option>` : ""}${custOpts}</select></td><td>${pill}</td></tr>`;
+      }).join("") + `</tbody></table></div>`;
+    if (unmapped.length && canNew) html += `<div class="btns"><button class="small" id="erpAllNew">${unmapped.length} 個未對應的都新增為新客戶</button></div>`;
+  }
+  // 還不能匯入的單：列出原因，點「前往」跳到那張單（手機上不用左右滑找）
+  const blockedList = state.example ? [] : state.orders.filter(o => !o.erp && erpProblems(o).length);
+  const unchecked = blockedList.filter(o => o.photo && !o.photoOk);
+  if (blockedList.length) {
+    html += `<div class="blocked"><b>還不能匯入的出貨單</b>` +
+      (unchecked.length ? `<div class="btns"><button class="small primary" id="erpAllOk">我已對照片核對全部 ${unchecked.length} 張</button></div>` : "") +
+      `<ul>${blockedList.map(o => `<li>${esc(o.customer || "（沒有客戶）")} ${esc(o.no)}：${esc(erpProblems(o).join("、"))} <button class="link" data-goto="${o.id}">前往</button></li>`).join("")}</ul></div>`;
+  }
+  html += `<div class="btns"><button class="primary" id="erpGo" ${!ready.length || unmapped.length || erp.busy ? "disabled" : ""}>${erp.busy ? "匯入中…" : `匯入 ${ready.length} 張到 ERP`}</button></div>`;
+  if (unmapped.length) html += `<p class="help">還有 ${unmapped.length} 個客戶沒有選對應，選好才能匯入。</p>`;
+  if (erp.result) html += `<div class="result">${erp.result}</div>`;
+  html += `</div>`;
+  body.innerHTML = html;
+  body.querySelectorAll("[data-erpmap]").forEach(sel => { sel.value = erpMapping(sel.dataset.erpmap).value; });
+}
+async function erpImport() {
+  const ready = erpReady();
+  if (!ready.length || erp.busy) return;
+  erp.busy = true; erp.result = ""; renderErp();
+  const created = [], dups = [], errors = [];
+  const tax = state.settings.tax > 0;
+  try {
+    // 每批最多 20 張、約 3MB（Vercel 一次最多收 4.5MB），有照片的出貨單會分成比較小的批次
+    const batches = [];
+    let cur = { orders: [], payload: [], bytes: 0 };
+    for (const o of ready) {
+      const m = erpMapping(o.customer).value;
+      const photo = o.photo ? await photoGet(o.photo) : "";
+      const row = {
+        ref: o.no || "", date: o.date, need_invoice: tax, file: o.file, ...(o.slipNote ? { note: o.slipNote } : {}),
+        ...(m === "new" ? { new_customer: o.customer } : { customer_id: Number(m.slice(3)) }),
+        ...(photo ? { photo } : {}),
+        items: o.items.map(it => ({ code: it.code || "", name: it.name, spec: it.spec || "", unit: it.unit || "", qty: it.qty, unit_price: it.price, amount: it.amount })),
+      };
+      const bytes = JSON.stringify(row).length;
+      if (cur.orders.length && (cur.orders.length >= 20 || cur.bytes + bytes > 3_000_000)) { batches.push(cur); cur = { orders: [], payload: [], bytes: 0 }; }
+      cur.orders.push(o); cur.payload.push(row); cur.bytes += bytes;
+    }
+    if (cur.orders.length) batches.push(cur);
+    let sent = 0;
+    for (const { orders: chunk, payload } of batches) {
+      sent += chunk.length;
+      erp.result = `正在匯入 ${sent}／${ready.length} 張…`; renderErp();
+      const r = await erpApi("/api/orders", { method: "POST", body: { action: "import_shipped", deduct_stock: true, orders: payload } });
+      r.results.forEach(x => {
+        const o = chunk[x.index];
+        if (x.status === "error") { o.erpError = x.message; errors.push(`${o.customer} ${o.date} ${o.no}：${x.message.replace(/^[^：]*：/, "")}`); return; }
+        o.erp = { id: x.id, order_no: x.order_no }; delete o.erpError;
+        (x.status === "created" ? created : dups).push(o);
+        if (x.customer_id && erpMapping(o.customer).value === "new") { state.erpMap = state.erpMap || {}; state.erpMap[o.customer] = "id:" + x.customer_id; }
+      });
+      save();
+    }
+  } catch (e) {
+    errors.push(e.status === 401 ? "ERP 登入已過期，請重新登入後再按一次匯入（已匯入的不會重複）。" : e.message);
+  }
+  try { erp.customers = await erpApi("/api/records?type=customers"); } catch (e) {}
+  erp.busy = false;
+  erp.result = `<div><b>已建立 ${created.length} 張訂單</b>${dups.length ? `，${dups.length} 張之前已經匯入過` : ""}${errors.length ? `，<span class="err">${errors.length} 個問題</span>` : ""}。
+    <a href="/#/receivables">看應收帳款</a>　<a href="/#/statement">月對帳單</a>　<a href="/#/orders">訂貨單</a></div>` +
+    errors.map(e => `<div class="err">${esc(e)}</div>`).join("");
+  save(); render();
+  toast(`已匯入 ${created.length} 張到 ERP`);
+}
+$("#erpBody").addEventListener("change", e => {
+  const sel = e.target.closest("[data-erpmap]"); if (!sel) return;
+  state.erpMap = state.erpMap || {}; state.erpMap[sel.dataset.erpmap] = sel.value; save(); renderErp();
+});
+$("#erpBody").addEventListener("click", e => {
+  if (e.target.closest("#erpGo")) { erpImport(); return; }
+  if (e.target.closest("#erpAllOk")) {
+    let n = 0; state.orders.forEach(o => { if (o.photo && !o.photoOk && !o.erp) { o.photoOk = true; n++; } });
+    save(); render(); toast(`已核對 ${n} 張照片`); return;
+  }
+  const go = e.target.closest("[data-goto]");
+  if (go) {
+    const id = go.dataset.goto; openOrders.add(id); closedOrders.delete(id);
+    $("#q").value = ""; $("#onlyWarn").checked = false; renderOrders(); lockImported();
+    const row = document.querySelector(`#ordBody tr[data-o="${id}"]`);
+    if (row) { row.scrollIntoView({ block: "start", behavior: "smooth" }); row.closest(".tablebox")?.scrollTo({ left: 0 }); }
+    return;
+  }
+  if (e.target.closest("#erpAllNew")) {
+    state.erpMap = state.erpMap || {};
+    erpReady().forEach(o => { if (!erpMapping(o.customer).value) state.erpMap[o.customer] = "new"; });
+    save(); renderErp();
+  }
+});
+
+/* ---------- 檔案網站（ERP 的 /tools/files.html）：讀出貨單、存回應收 Excel ---------- */
+const FILES_API = "/api/lookup?route=files";
+const PICK_RE = /\.(docx|xlsx|xlsm|xls|csv)$/i;
+const pick = { open: false, loading: false, files: [], folder: "*", sel: new Set(), error: "" };
+function renderPick() {
+  if (!ERP_MODE) return;
+  $("#pick").hidden = !erp.user;
+  $("#fsSave").hidden = !(erp.user && erpCan("files.write"));
+  const box = $("#pickBox"); box.hidden = !pick.open;
+  $("#pickOpen").textContent = pick.open ? "收起檔案網站清單" : "從檔案網站選擇出貨單";
+  if (!pick.open) return;
+  if (pick.loading) { box.innerHTML = `<p class="help">讀取檔案清單…</p>`; return; }
+  if (pick.error) { box.innerHTML = `<p class="help">${esc(pick.error)}</p>`; return; }
+  const folders = [...new Set(pick.files.map(f => f.folder))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  const list = pick.files.filter(f => pick.folder === "*" || f.folder === pick.folder);
+  const seen = new Set(state.seen.map(s => s.split("|")[0] === "fs" ? s : "").filter(Boolean));
+  box.innerHTML = `<div class="btns"><select id="pickFolder" aria-label="資料夾"><option value="*">全部資料夾</option>${folders.map(f => `<option value="${esc(f)}">${esc(f || "未分類")}</option>`).join("")}</select></div>` +
+    (list.length ? `<div class="list">${list.map(f => `<label class="row"><input type="checkbox" data-pick="${f.id}" ${pick.sel.has(f.id) ? "checked" : ""}>${esc(f.name)}${seen.has("fs|" + f.id) ? ` <span class="pill ok">已讀取</span>` : ""}<span class="m">${esc(f.folder || "未分類")} · ${new Date(f.created_at).toLocaleDateString("zh-TW")}</span></label>`).join("")}</div>`
+      : `<p class="help">檔案網站裡沒有 Word 或 Excel 檔。<a href="/tools/files.html">先去上傳</a></p>`) +
+    `<div class="btns"><button id="pickGo" class="primary small" ${pick.sel.size ? "" : "disabled"}>讀取選取的 ${pick.sel.size} 個檔案</button></div>`;
+  $("#pickFolder").value = pick.folder;
+}
+async function pickLoad() {
+  pick.loading = true; pick.error = ""; renderPick();
+  try {
+    pick.files = (await erpApi(FILES_API)).files.filter(f => PICK_RE.test(f.name));
+    // 有「出貨單」資料夾時預設只列那裡，免得選到存回去的應收 Excel
+    if (pick.folder === "*" && pick.files.some(f => f.folder === "出貨單")) pick.folder = "出貨單";
+  }
+  catch (e) { pick.error = e.message; }
+  pick.loading = false; renderPick();
+}
+async function loadFromFileSite(ids) {
+  const files = [], errs = [];
+  for (const id of ids) {
+    try {
+      const res = await fetch(`${FILES_API}&id=${id}`, { credentials: "same-origin" });
+      if (!res.ok) { let m = ""; try { m = (await res.json()).error; } catch (e) {} throw new Error(m || `讀取失敗（${res.status}）`); }
+      const cd = res.headers.get("content-disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+      const name = m ? decodeURIComponent(m[1]) : `檔案${id}.xlsx`;
+      // lastModified 用檔案編號，讓「已讀過」判斷認得同一個檔案網站檔案
+      const f = new File([await res.blob()], name, { lastModified: id });
+      f.fsId = id; files.push(f);
+    } catch (e) { errs.push(`檔案 #${id}：${e.message}`); }
+  }
+  if (files.length) await handleFiles(files);
+  if (errs.length) $("#log").innerHTML += errs.map(e => `<div class="err">${esc(e)}</div>`).join("");
+}
+async function saveToFileSite(name, blob, folder = "應收帳款") {
+  const r = await erpApi(`${FILES_API}&folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`, { method: "POST", raw: blob });
+  return r;
+}
+$("#pickOpen").addEventListener("click", () => { pick.open = !pick.open; if (pick.open && !pick.files.length) pickLoad(); else renderPick(); });
+$("#pickBox").addEventListener("change", e => {
+  if (e.target.id === "pickFolder") { pick.folder = e.target.value; renderPick(); return; }
+  const c = e.target.closest("[data-pick]"); if (!c) return;
+  const id = +c.dataset.pick; c.checked ? pick.sel.add(id) : pick.sel.delete(id); renderPick();
+});
+$("#pickBox").addEventListener("click", async e => {
+  if (!e.target.closest("#pickGo")) return;
+  const ids = [...pick.sel]; pick.sel.clear(); pick.open = false; renderPick();
+  await loadFromFileSite(ids);
+});
+$("#fsAll").addEventListener("click", async () => {
+  const f = allWorkbook(); if (!f) { toast("還沒有應收帳款可以存"); return; }
+  try { const r = await saveToFileSite(f.name, f.blob); toast(r.duplicate ? "檔案網站已經有一模一樣的檔案" : `已存到檔案網站「應收帳款」：${f.name}`); }
+  catch (e) { toast("存檔失敗：" + e.message); }
+});
+$("#fsEach").addEventListener("click", async () => {
+  const groups = buildGroups(); if (!groups.length) { toast("還沒有應收帳款可以存"); return; }
+  let n = 0, dup = 0;
+  try {
+    for (const g of groups) { const r = await saveToFileSite(safeFile(g.name) + ".xlsx", wbBytes(groupWorkbook([g]))); r.duplicate ? dup++ : n++; }
+    toast(`已存 ${n} 張應收單到檔案網站「應收帳款」` + (dup ? `，${dup} 張已經存過` : ""));
+  } catch (e) { toast(`存到第 ${n + dup + 1} 張時失敗：${e.message}`); }
+});
+$("#arBody").addEventListener("click", async e => {
+  const b = e.target.closest("[data-fs]"); if (!b) return;
+  e.stopPropagation();
+  const g = buildGroups().find(x => x.key === b.dataset.fs); if (!g) return;
+  try { const r = await saveToFileSite(safeFile(g.name) + ".xlsx", wbBytes(groupWorkbook([g]))); toast(r.duplicate ? "檔案網站已經有一模一樣的檔案" : `已存到檔案網站「應收帳款」：${g.name}`); }
+  catch (err) { toast("存檔失敗：" + err.message); }
+}, true);
+
+/* ---------- example data ---------- */
+function exampleOrders() {
+  const P = { alg: ["藻膠印模材 500g", "袋", 380], cr: ["光聚合複合樹脂 A2 4g", "支", 650], nd: ["麻醉注射針頭 27G", "盒", 220], bond: ["牙本質黏著劑 5ml", "瓶", 1450], file: ["鎳鈦根管銼 25mm", "盒", 980], glove: ["無粉乳膠手套 M", "盒", 160], cup: ["拋光杯 拋棄式", "包", 120] };
+  const mk = (customer, date, no, list) => ({ id: uid(), file: "範例出貨單.docx", src: "", customer, date, no, stated: null, notes: [],
+    items: list.map(([k, q]) => ({ name: P[k][0], spec: "", qty: q, unit: P[k][1], price: P[k][2], amount: q * P[k][2], note: "" })) });
+  return [
+    mk("仁心牙醫診所", "2026-09-08", "SO260908-01", [["alg", 4], ["glove", 10]]),
+    mk("仁心牙醫診所", "2026-09-22", "SO260922-03", [["cr", 6], ["bond", 1]]),
+    mk("仁心牙醫診所", "2026-10-06", "SO261006-02", [["nd", 3], ["cup", 5], ["glove", 6]]),
+    mk("仁心牙醫診所", "2026-10-27", "SO261027-01", [["file", 2]]),
+    mk("晴光牙醫", "2026-10-02", "SO261002-04", [["cr", 10], ["bond", 2], ["alg", 2]]),
+    mk("晴光牙醫", "2026-10-15", "SO261015-01", [["glove", 20]]),
+    mk("晴光牙醫", "2026-11-03", "SO261103-02", [["nd", 4], ["file", 3]]),
+    mk("康橋牙科診所", "2026-11-10", "SO261110-05", [["cup", 8], ["alg", 3], ["cr", 4]]),
+  ];
+}
+load();
+if (!ERP_MODE && !state.orders.length && !state.dismissedExample) { state.orders = exampleOrders(); state.example = true; }
+if (ERP_MODE && state.example) { state.orders = []; state.example = false; }
+render();
+if (ERP_MODE) erpInit();
+</script>
