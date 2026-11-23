@@ -590,7 +590,8 @@ async function handleFiles(files) {
   const log = [];
   const before = state.orders.length;
   if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; openGroups.clear(); openOrders.clear(); }
-  let added = 0;
+  let added = 0, photoNo = 0;
+  const photoTotal = files.filter(f => IMG_RE.test(f.name) || /^image\//.test(f.type || "")).length;
   for (const f of files) {
     const src = f.fsId ? "fs|" + f.fsId : f.name + "|" + f.size + "|" + f.lastModified;
     const ext = (f.name.split(".").pop() || "").toLowerCase();
@@ -598,7 +599,8 @@ async function handleFiles(files) {
     try {
       let orders;
       if (IMG_RE.test(f.name) || /^image\//.test(f.type || "")) {
-        $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("") + `<div>${esc(f.name)}：AI 辨識中…</div>`;
+        photoNo++;
+        $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("") + `<div>${esc(f.name)}：AI 辨識中…（照片第 ${photoNo}／${photoTotal} 張，每張約 10～30 秒，請不要關掉這一頁）</div>`;
         orders = await readPhoto(f, src);
       } else if (ext === "docx") orders = await readDocx(f, src);
       else if (["xlsx", "xlsm", "xls", "csv"].includes(ext)) orders = await readExcel(f, src);
@@ -1270,7 +1272,9 @@ $("#erpBody").addEventListener("click", e => {
 
 /* ---------- 檔案網站（ERP 的 /tools/files.html）：讀出貨單、存回應收 Excel ---------- */
 const FILES_API = "/api/lookup?route=files";
-const PICK_RE = /\.(docx|xlsx|xlsm|xls|csv)$/i;
+// 照片只有能用 AI 辨識時才列出
+const PICK_RE_DOC = /\.(docx|xlsx|xlsm|xls|csv)$/i, PICK_RE_IMG = /\.(jpe?g|png|webp)$/i;
+const PICK_RE = { test: n => PICK_RE_DOC.test(n) || (erp.user && erpCan("ai") && PICK_RE_IMG.test(n)) };
 const pick = { open: false, loading: false, files: [], folder: "*", sel: new Set(), error: "" };
 function renderPick() {
   if (!ERP_MODE) return;
