@@ -129,6 +129,13 @@ a.pill{text-decoration:none}
 .pick label.row:last-child{border-bottom:none}
 .pick label.row span.m{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
 .help li{margin:2px 0}
+.dup{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.duphead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.dupg{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:8px}
+.dupm{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dupm img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--bg)}
+.dupm img.big{width:100%;height:auto;cursor:zoom-out}
+.dupi{flex:1;min-width:160px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -237,6 +244,7 @@ a.pill{text-decoration:none}
       <h2>出貨單</h2>
       <div id="ordStats" class="stats"></div>
     </div>
+    <div id="dupBox" class="dup" hidden></div>
     <div class="toolbar">
       <input id="q" type="search" placeholder="搜尋客戶、單號、品名、檔名">
       <label class="chk"><input id="onlyWarn" type="checkbox"> 只看需要確認的</label>
@@ -260,6 +268,7 @@ a.pill{text-decoration:none}
       <li>帳款月份：結帳日設為月底時依出貨日期的月份；設為 25 日時，10/26～11/25 的出貨算 11 月份。</li>
       <li>品項的金額和「數量×單價」相差超過 1 元時會標紅，並提示正確金額，可以一鍵改正；下載的「出貨明細」也會在「檢查」欄註明。</li>
       <li>讀不到或金額對不起來的出貨單會標「需確認」，可以直接在表格裡修改。</li>
+      <li>重複的出貨單：單號、日期、金額都一樣的，上傳時自動合併成一張；單號一樣但日期或金額不同，或沒有單號但客戶、日期、品項、金額都一樣的，列在「出貨單」上方請你確認，可以選要保留哪一張合併，或標記「不是重複」。合併或確認前不會匯入 ERP。</li>
     </ul>
   </details>
 </div>
@@ -591,6 +600,7 @@ async function handleFiles(files) {
   const before = state.orders.length;
   if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; openGroups.clear(); openOrders.clear(); }
   let added = 0, photoNo = 0;
+  const newIds = new Set();
   const photoTotal = files.filter(f => IMG_RE.test(f.name) || /^image\//.test(f.type || "")).length;
   for (const f of files) {
     const src = f.fsId ? "fs|" + f.fsId : f.name + "|" + f.size + "|" + f.lastModified;
@@ -608,13 +618,23 @@ async function handleFiles(files) {
       else throw new Error("不支援這種檔案");
       if (!orders.length) throw new Error("沒有找到出貨單內容");
       state.orders.push(...orders); state.seen.push(src); added += orders.length;
+      orders.forEach(o => newIds.add(o.id));
       const nw = orders.filter(o => warnings(o).length).length;
       log.push({ msg: `${f.name}：${orders.length} 張出貨單` + (nw ? `，${nw} 張需要確認` : "") });
     } catch (e) { log.push({ err: true, msg: `${f.name}：${e.message || e}` }); }
   }
+  // 同一張出貨單拍了兩次、上傳兩次：單號、日期、金額都一樣的自動合併成一張
+  refreshDups();
+  let merged = 0;
+  dupGroups.filter(g => g.sure && g.orders.some(o => newIds.has(o.id))).forEach(g => {
+    const n = mergeDup(g, keeperOf(g).id);
+    if (n) { merged += n; log.push({ msg: `單號 ${dupTitle(g)}：重複上傳，已合併成一張` }); }
+  });
+  if (merged) dropUnusedPhotos();
   $("#log").innerHTML = log.map(l => `<div class="${l.err ? "err" : ""}">${esc(l.msg)}</div>`).join("");
   save(); render();
-  toast(added ? `新增 ${added} 張出貨單` : "沒有新增出貨單");
+  added -= merged;
+  toast((added ? `新增 ${added} 張出貨單` : "沒有新增出貨單") + (merged ? `，${merged} 張重複已合併` : "") + (dupGroups.length ? `，還有 ${dupGroups.length} 組可能重複要確認` : ""));
 }
 
 /* ---------- receivables ---------- */
@@ -634,6 +654,7 @@ function amtWrong(it) {
 const badItems = o => o.items.filter(amtWrong).length;
 function warnings(o) {
   const w = [];
+  if (dupOf.has(o.id)) w.push(DUP_WARN);
   const nb = badItems(o);
   if (nb) w.push(`${nb} 項金額≠數量×單價`);
   if (!o.customer) w.push("缺客戶");
@@ -687,6 +708,7 @@ function buildGroups() {
 
 /* ---------- rendering ---------- */
 function render() {
+  refreshDups();
   $("#exampleBanner").hidden = !state.example;
   $("#cutoff").value = String(state.settings.cutoff);
   $("#tax").value = String(state.settings.tax);
@@ -694,6 +716,7 @@ function render() {
   renderAR(groups);
   renderAliases();
   renderOrders();
+  renderDups();
   lockImported();
   renderErp();
   const has = groups.length > 0;
@@ -741,7 +764,8 @@ function renderOrders() {
   const only = $("#onlyWarn").checked;
   let list = state.orders.slice().sort((a, b) => (a.customer || "￿").localeCompare(b.customer || "￿", "zh-Hant") || sortOrders(a, b));
   const nWarn = state.orders.filter(o => warnings(o).length).length;
-  $("#ordStats").innerHTML = `<span>共 <b class="num">${state.orders.length}</b> 張</span>` + (nWarn ? `<span class="pill warn">${nWarn} 張需確認</span>` : state.orders.length ? `<span class="pill ok">全部讀取完整</span>` : "");
+  const nDup = dupGroups.reduce((s, g) => s + g.orders.length - 1, 0);
+  $("#ordStats").innerHTML = `<span>共 <b class="num">${state.orders.length}</b> 張</span>` + (nDup ? `<span class="pill warn">${nDup} 張重複</span>` : "") + (nWarn ? `<span class="pill warn">${nWarn} 張需確認</span>` : state.orders.length ? `<span class="pill ok">全部讀取完整</span>` : "");
   if (only) list = list.filter(o => warnings(o).length);
   if (q) list = list.filter(o => squash([o.customer, o.no, o.file, o.date, ...o.items.map(i => i.name + specOf(i))].join(" ")).toLowerCase().includes(q));
   const body = $("#ordBody");
@@ -780,6 +804,95 @@ function lockImported() {
   state.orders.filter(o => o.erp).forEach(o => document.querySelectorAll(`#ordBody tr[data-o="${o.id}"]`).forEach(tr =>
     tr.querySelectorAll("input, [data-act=addItem], [data-act=delItem], [data-act=fixAmt]").forEach(el => { el.disabled = true; el.title = "已匯入 ERP，這裡修改不會改到 ERP"; })));
 }
+
+/* ---------- 重複的出貨單：同一張單拍兩次、上傳兩次 → 合併成一張 ---------- */
+const DUP_WARN = "可能重複";
+let dupGroups = [], dupOf = new Map();
+// 單號：去掉「NO.」等前綴，至少要有 3 個數字才拿來比
+const noKey = s => { const k = squash(s).toUpperCase().replace(/^(NO|單號)[.:：]?/, ""); return /\d{3,}/.test(k) ? k : ""; };
+const itemsKey = o => o.items.map(it => squash(it.name) + "×" + (Number(it.qty) || 0)).sort().join("|");
+const sameMoney = (a, b) => Math.abs(orderTotal(a) - orderTotal(b)) <= 1;
+function notDupPair(a, b) { return (state.notDup || []).some(g => g.includes(a) && g.includes(b)); }
+function sameSlip(a, b, ka, kb) {
+  if (notDupPair(a.id, b.id)) return false;
+  if (ka.no && kb.no) return ka.no === kb.no;
+  // 有一張沒讀到單號：同客戶、同日期、同金額、同品項才算
+  return !!a.date && a.date === b.date && !!ka.cust && ka.cust === kb.cust && ka.items === kb.items && orderTotal(a) > 0 && sameMoney(a, b);
+}
+function refreshDups() {
+  dupGroups = []; dupOf = new Map();
+  if (state.example) return;
+  const os = state.orders;
+  const keys = os.map(o => ({ no: noKey(o.no), cust: erpKey(o.customer), items: itemsKey(o) }));
+  const parent = os.map((_, i) => i);
+  const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
+  for (let i = 0; i < os.length; i++) for (let j = i + 1; j < os.length; j++)
+    if (find(i) !== find(j) && sameSlip(os[i], os[j], keys[i], keys[j])) parent[find(i)] = find(j);
+  const map = new Map();
+  os.forEach((o, i) => { const r = find(i); if (!map.has(r)) map.set(r, []); map.get(r).push(o); });
+  map.forEach(list => {
+    if (list.length < 2) return;
+    const no = noKey(list[0].no);
+    // 確定重複：單號都一樣、日期都一樣、金額都一樣，最多一張已匯入 ERP
+    const sure = !!no && list.every(o => noKey(o.no) === no && o.date && o.date === list[0].date && sameMoney(o, list[0])) && list.filter(o => o.erp).length <= 1;
+    const g = { orders: list, sure };
+    dupGroups.push(g);
+    list.forEach(o => dupOf.set(o.id, g));
+  });
+}
+const dupTitle = g => (g.orders.find(o => o.no) || {}).no || "";
+// 留哪一張：已匯入 ERP > 已核對照片 > 問題比較少 > 品項比較多 > 先上傳的
+function keeperOf(g) {
+  const score = o => [o.erp ? 0 : 1, o.photoOk ? 0 : 1, warnings(o).filter(w => w !== DUP_WARN).length, -o.items.length, state.orders.indexOf(o)];
+  return g.orders.slice().sort((a, b) => { const x = score(a), y = score(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; })[0];
+}
+// 合併：留一張，另一張缺的資料（客戶、日期、單號、品項、照片）補進去，再刪掉；已匯入 ERP 的不刪
+function mergeDup(g, keepId) {
+  const keep = g.orders.find(o => o.id === keepId); if (!keep) return 0;
+  const drop = g.orders.filter(o => o !== keep && !o.erp);
+  drop.forEach(o => {
+    ["customer", "date", "no", "slipNote"].forEach(f => { if (!keep[f] && o[f]) keep[f] = o[f]; });
+    if (!keep.items.length && o.items.length) { keep.items = o.items; keep.stated = o.stated; }
+    if (!keep.photo && o.photo) { keep.photo = o.photo; keep.doubts = o.doubts; keep.photoOk = !!o.photoOk; keep.custCandidates = o.custCandidates; }
+    keep.merged = (keep.merged || 0) + 1 + (o.merged || 0);
+    openOrders.delete(o.id);
+  });
+  state.orders = state.orders.filter(o => !drop.includes(o));
+  return drop.length;
+}
+function renderDups() {
+  const box = $("#dupBox");
+  if (!dupGroups.length) { box.hidden = true; box.innerHTML = ""; return; }
+  const extra = dupGroups.reduce((s, g) => s + g.orders.length - 1, 0);
+  const sure = dupGroups.filter(g => g.sure);
+  box.hidden = false;
+  box.innerHTML = `<div class="duphead"><span><b>找到 ${dupGroups.length} 組重複的出貨單（多出 ${extra} 張）</b>，合併前不會匯入 ERP。合併後只留一張，另一張的照片和缺的資料會補進去。</span>` +
+    (sure.length ? `<button class="small primary" data-dup="all">合併 ${sure.length} 組確定重複的</button>` : "") + `</div>` +
+    dupGroups.map((g, gi) => {
+      const k = keeperOf(g), nErp = g.orders.filter(o => o.erp).length, t = dupTitle(g);
+      return `<div class="dupg"><div><b>${esc(t ? "單號 " + t : (g.orders[0].customer || "沒有單號"))}</b> ` +
+        (g.sure ? `<span class="pill ok">確定重複：單號、日期、金額都一樣</span>` : `<span class="pill warn">${t ? "單號一樣，但日期或金額不同" : "沒讀到單號，但客戶、日期、品項、金額都一樣"}，請對照片確認</span>`) + `</div>` +
+        g.orders.map(o => `<div class="dupm">${o.photo ? `<img data-photo="${esc(o.photo)}" alt="出貨單照片" title="點一下放大／縮小">` : ""}
+          <div class="dupi">${esc(o.customer || "（沒有客戶）")} · ${o.date ? o.date.replace(/-/g, "/") : "沒有日期"} · ${esc(o.no || "沒有單號")} · ${o.items.length} 項 · <span class="num">${fmt(orderTotal(o))}</span>` +
+          `${o.photoOk ? ` <span class="pill ok">已核對</span>` : ""}${o.erp ? ` <span class="pill ok">ERP ${esc(o.erp.order_no)}</span>` : ""}<div class="src" title="${esc(o.file)}">${esc(o.file)}</div></div>` +
+          ((nErp > 1 || (nErp && !o.erp)) ? "" : `<button class="small${o === k ? " primary" : ""}" data-dup="keep" data-g="${gi}" data-id="${o.id}">保留這張，合併其他</button>`) + `</div>`).join("") +
+        (nErp > 1 ? `<p class="help">這幾張都已經匯入 ERP，請到 ERP 刪除多出來的訂單。</p>` : "") +
+        `<div class="btns"><button class="small" data-dup="not" data-g="${gi}">不是重複，分開保留</button></div></div>`;
+    }).join("");
+  box.querySelectorAll("img[data-photo]").forEach(fillPhoto);
+}
+$("#dupBox").addEventListener("click", e => {
+  const img = e.target.closest("img[data-photo]"); if (img) { img.classList.toggle("big"); return; }
+  const b = e.target.closest("[data-dup]"); if (!b) return;
+  const act = b.dataset.dup;
+  if (act === "all") {
+    let n = 0; dupGroups.filter(g => g.sure).forEach(g => { n += mergeDup(g, keeperOf(g).id); });
+    dropUnusedPhotos(); save(); render(); toast(`已合併 ${n} 張重複的出貨單`); return;
+  }
+  const g = dupGroups[+b.dataset.g]; if (!g) return;
+  if (act === "keep") { const n = mergeDup(g, b.dataset.id); dropUnusedPhotos(); save(); render(); toast(`已合併 ${n} 張`); return; }
+  if (act === "not") { state.notDup = state.notDup || []; state.notDup.push(g.orders.map(o => o.id)); save(); render(); toast("已標記不是重複"); }
+});
 
 /* ---------- excel export ---------- */
 function serial(date) { const [y, m, d] = date.split("-").map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; }
@@ -926,7 +1039,7 @@ $("#dlZip").addEventListener("click", downloadZip);
 $("#clearExample").addEventListener("click", () => { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; save(); render(); });
 $("#clearAll").addEventListener("click", () => { $("#confirmClear").hidden = false; });
 $("#clearNo").addEventListener("click", () => { $("#confirmClear").hidden = true; });
-$("#clearYes").addEventListener("click", () => { photoClear(); state.orders = []; state.seen = []; state.example = false; state.dismissedExample = true; $("#confirmClear").hidden = true; $("#log").innerHTML = ""; save(); render(); toast("已清除"); });
+$("#clearYes").addEventListener("click", () => { photoClear(); state.orders = []; state.seen = []; state.notDup = []; state.example = false; state.dismissedExample = true; $("#confirmClear").hidden = true; $("#log").innerHTML = ""; save(); render(); toast("已清除"); });
 $("#addOrder").addEventListener("click", () => {
   if (state.example) { state.orders = []; state.example = false; state.seen = []; state.dismissedExample = true; }
   const o = { id: uid(), file: "手動新增", src: "", customer: "", date: new Date().toISOString().slice(0, 10), no: "", items: [{ name: "", spec: "", qty: 1, unit: "", price: null, amount: null, note: "" }], stated: null, notes: [] };
