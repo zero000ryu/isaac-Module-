@@ -5,9 +5,9 @@
    "phone": 7778,
    "address": 7781,
    "zip": 7781,
-   "hours": 7357,
+   "hours": 7358,
    "dentists": 7048,
-   "doctors": 5652,
+   "doctors": 5653,
    "programs": 7191,
    "regFee": 6739,
    "website": 0,
@@ -22,9 +22,9 @@
   "addressDiffs": 281,
   "relocations": 121,
   "sharedAddress": 441,
-  "namedDentists": 13130,
+  "namedDentists": 13131,
   "dentistsAtSeveralClinics": 1359,
-  "clinicsWithDoctors": 5652,
+  "clinicsWithDoctors": 5653,
   "avgCompleteness": 53,
   "hoursCompared": 0,
   "hoursDiffer": 0,
@@ -2864,15 +2864,6 @@
    "values": [
     "07-3949939",
     "07-3949938"
-   ]
-  },
-  {
-   "code": "3707300564",
-   "name": "101牙醫診所唐松廉",
-   "type": "名稱不一致",
-   "values": [
-    "101牙醫診所",
-    "101牙醫診所唐松廉"
    ]
   },
   {
@@ -5865,11 +5856,20 @@
   },
   {
    "code": "3731171399",
-   "name": "頭等艙牙醫診所",
+   "name": "三井美學牙醫診所",
    "type": "電話不一致",
    "values": [
     "02-26003080",
     "26002076"
+   ]
+  },
+  {
+   "code": "3731171399",
+   "name": "三井美學牙醫診所",
+   "type": "名稱不一致",
+   "values": [
+    "頭等艙牙醫診所",
+    "三井美學牙醫診所"
    ]
   },
   {
