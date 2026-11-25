@@ -45,7 +45,7 @@ except ImportError:
 # 欄位別名：不同檔案欄名不一樣時，統一成左邊的名稱
 COLUMN_ALIASES = {
     "日期": ["日期", "Date", "date", "交易日期", "單據日期"],
-    "品名": ["品名", "產品名稱", "商品名稱", "品項", "產品"],
+    "品名": ["品名", "產品名稱", "商品名稱", "產品"],
     "數量": ["數量", "Qty", "qty", "QTY"],
     "單價": ["單價", "價格", "Price"],
     "金額": ["金額", "小計", "總額", "Amount", "合計金額"],
@@ -56,7 +56,8 @@ COLUMN_ALIASES = {
 DATE_KEYWORDS = ["日期", "date", "出貨日", "訂單日", "交易日", "銷貨日", "進貨日", "時間", "月份", "年月", "日"]
 
 # 欄名含這些字的數字欄不做加總（編號類）
-NO_SUM_KEYWORDS = ["編號", "代號", "號碼", "電話", "統編", "序號", "單號", "料號", "id", "ID", "郵遞", "年", "月份", "項次"]
+NO_SUM_KEYWORDS = ["編號", "代號", "號碼", "電話", "統編", "序號", "單號", "料號", "id", "ID", "郵遞", "年", "月份",
+                   "項次", "品項", "單價", "價格", "折扣", "%"]
 
 SUPPORTED_EXT = (".xlsx", ".xlsm", ".xls", ".csv")
 DEFAULT_OUTPUT = "彙整總表.xlsx"
@@ -202,8 +203,12 @@ def tidy(raw):
     raw = raw.reset_index(drop=True)
     h = find_header_row(raw)
     headers, seen = [], {}
+    raw_names = {norm_name(v) for v in raw.iloc[h] if isinstance(v, str)}
     for j, v in enumerate(raw.iloc[h]):
-        name = unify_column(v) if not (v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() == "") else f"欄{j + 1}"
+        u = unify_column(v)
+        if u != norm_name(v) and u in raw_names:  # 這張表本來就有同名欄，不改名
+            u = norm_name(v)
+        name = u if not (v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() == "") else f"欄{j + 1}"
         if name in seen:
             seen[name] += 1
             name = f"{name}_{seen[name]}"
@@ -229,14 +234,40 @@ def read_csv_any(path):
     raise ValueError("無法判斷 CSV 編碼")
 
 
-def read_file(path):
-    """回傳 [(工作表名稱, DataFrame), ...]"""
+def form_like_sheets(path):
+    """找出「單據版面」的工作表（合併儲存格很多，例如交貨單、報價單），這種不是表格，不合併。"""
+    if not path.lower().endswith((".xlsx", ".xlsm")):
+        return set()
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=False, data_only=True)
+    except Exception:
+        return set()
+    out = set()
+    for ws in wb.worksheets:
+        merged = len(ws.merged_cells.ranges)
+        if merged >= 10 and merged >= ws.max_row * 0.2:
+            out.add(ws.title)
+    return out
+
+
+def read_file(path, only_sheets=None):
+    """回傳 [(工作表名稱, DataFrame 或 略過原因), ...]"""
     ext = os.path.splitext(path)[1].lower()
     if ext == ".csv":
         return [("", tidy(read_csv_any(path)))]
     engine = "xlrd" if ext == ".xls" else "openpyxl"
     sheets = pd.read_excel(path, sheet_name=None, header=None, dtype=object, engine=engine)
-    return [(name, tidy(df)) for name, df in sheets.items()]
+    forms = set() if only_sheets else form_like_sheets(path)
+    out = []
+    for name, df in sheets.items():
+        if only_sheets and name not in only_sheets:
+            out.append((name, "不在 --sheet 指定的工作表內"))
+        elif name in forms:
+            out.append((name, "單據版面（合併儲存格多），不是表格"))
+        else:
+            out.append((name, tidy(df)))
+    return out
 
 
 # ─── 主流程 ──────────────────────────────────────────────────────
@@ -288,7 +319,7 @@ def to_number(series):
     return pd.to_numeric(s, errors="coerce")
 
 
-def build(folder, output, date_col=None, split=True, recursive=False):
+def build(folder, output, date_col=None, split=True, recursive=False, only_sheets=None):
     files = collect_files(folder, recursive, output)
     if not files:
         print(f"在「{folder}」找不到 Excel / CSV 檔案。")
@@ -300,7 +331,7 @@ def build(folder, output, date_col=None, split=True, recursive=False):
     for path in files:
         fname = os.path.relpath(path, folder)
         try:
-            sheets = read_file(path)
+            sheets = read_file(path, only_sheets)
         except ImportError:
             print(f"  ✗ {fname}：讀 .xls 需要 xlrd，請執行 pip install xlrd")
             log.append([fname, "", 0, "讀取失敗：缺少 xlrd"])
@@ -312,8 +343,15 @@ def build(folder, output, date_col=None, split=True, recursive=False):
         file_month = month_from_text(os.path.basename(path), this_year)
         file_year = int(file_month[:4]) if file_month else (year_from_text(os.path.basename(path)) or this_year)
         for sheet, df in sheets:
+            label = f"{fname}" + (f" [{sheet}]" if sheet else "")
+            if isinstance(df, str):
+                print(f"  - {label}：略過（{df}）")
+                log.append([fname, sheet, 0, f"略過：{df}"])
+                continue
             if df.empty:
                 continue
+            # 資料裡已經有「月份 / 來源檔案 / 工作表」欄時，改名保留，避免和程式加的欄位衝突
+            df = df.rename(columns={c: f"{c}(原)" for c in ("月份", "來源檔案", "工作表") if c in df.columns})
             dcol = pick_date_column(df, date_col)
             sheet_month = month_from_text(sheet, file_year) if sheet else None
             if dcol:
@@ -340,7 +378,6 @@ def build(folder, output, date_col=None, split=True, recursive=False):
             df["_檔案順序"] = len(frames)
             frames.append(df)
             got = ", ".join(sorted(set(df["月份"])))
-            label = f"{fname}" + (f" [{sheet}]" if sheet else "")
             print(f"  ✓ {label}：{len(df)} 筆，月份依{how} → {got}")
             log.append([fname, sheet, len(df), f"依{how}判斷：{got}"])
 
@@ -370,6 +407,8 @@ def build(folder, output, date_col=None, split=True, recursive=False):
         nonnull = nonnull[nonnull.astype(str).str.strip() != ""]
         if nonnull.empty or any(isinstance(v, (dt.datetime, dt.date, pd.Timestamp)) for v in nonnull.head(50)):
             continue
+        if any(isinstance(v, str) and re.fullmatch(r"0\d+", v.strip()) for v in nonnull):
+            continue  # 01、02 這類代碼保留文字，不轉數字
         conv = to_number(col)
         if conv.notna().sum() >= len(nonnull) * 0.9:
             merged[c] = conv
@@ -451,6 +490,7 @@ def main():
     ap.add_argument("--date-col", help="指定日期欄名稱（自動判斷不準時使用）")
     ap.add_argument("--no-split", action="store_true", help="不要產生每月分頁")
     ap.add_argument("-r", "--recursive", action="store_true", help="包含子資料夾")
+    ap.add_argument("--sheet", action="append", help="只讀這個名稱的工作表（可重複，例如 --sheet 彙整）")
     a = ap.parse_args()
 
     folder = os.path.abspath(a.folder)
@@ -459,7 +499,7 @@ def main():
         sys.exit(1)
     output = a.output or os.path.join(folder, DEFAULT_OUTPUT)
     try:
-        ok = build(folder, output, a.date_col, not a.no_split, a.recursive)
+        ok = build(folder, output, a.date_col, not a.no_split, a.recursive, set(a.sheet) if a.sheet else None)
     except PermissionError:
         print(f"\n無法寫入 {output}，可能檔案正開在 Excel 裡，請關閉後再執行。")
         ok = False
