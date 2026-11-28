@@ -138,6 +138,62 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
 .disclaimer{margin:14px 2px 0;font-size:12px;color:var(--muted);line-height:1.7}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;
   font-size:13px;box-shadow:var(--shadow);z-index:50}
+.views{margin-right:4px}
+.opt-in{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fld span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fld input{width:100%;font-family:var(--f-mono)}
+.fld.sym input{font-weight:500;text-transform:uppercase}
+.mood{display:inline-block;font-size:12px;border-radius:6px;padding:2px 8px;margin-top:8px;background:var(--accent-soft)}
+.otbl td:nth-child(2),.otbl th:nth-child(2){position:static}
+.otbl th:first-child,.otbl td:first-child{position:sticky;left:0;background:var(--panel);z-index:1;text-align:left;font-family:var(--f-body)}
+.otbl th:first-child{z-index:3}
+.otbl td:nth-child(2){font-family:var(--f-body);font-size:12px;color:var(--muted)}
+.otbl tr.sel td{background:var(--accent-soft)}
+.otbl tr.dim td{opacity:.45}
+.otbl td b{font-weight:500}
+.otbl .en{display:block;font-size:11px;color:var(--muted)}
+.ostrat{margin-top:10px}
+.ohead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ohead h2{margin:0;font-size:17px}
+.ohead .note{margin:0}
+.ogrid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;margin-top:10px}
+.legs{width:100%;border-collapse:collapse}
+.legs th,.legs td{position:static!important;text-align:left;padding:4px 4px;border-bottom:1px solid var(--line);background:none!important;font-family:var(--f-body)}
+.legs th{font-size:12px}
+.legs input,.legs select{min-height:30px;padding:3px 6px;font-size:13px;width:100%;background:var(--paper)}
+.legs select{padding-right:2px;min-width:58px}
+.legs td:nth-child(3){width:52px}
+.legs input{font-family:var(--f-mono)}
+.legs td.th{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.legs .x{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:6px;font-size:16px}
+.legs .x:hover{background:var(--row-hover);color:var(--ink)}
+.legs input.custom{border-color:var(--warn)}
+.legbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:0}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-family:var(--f-mono);font-size:16px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.greeks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.chartbox{position:relative;margin-top:10px}
+.chartbox svg{display:block;width:100%;height:300px;touch-action:pan-y}
+.chartbox text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;flex-wrap:wrap}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:5px}
+.legend i.now{border-top:2px dashed var(--muted)}
+.legend i.band{height:10px;border:0;background:var(--accent-soft)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;
+  box-shadow:var(--shadow);white-space:nowrap;font-family:var(--f-mono);z-index:4}
+.tip b{font-family:var(--f-body);font-weight:500;display:block}
+@media (max-width:900px){
+  .opt-in{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .ogrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .opt-in{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles,.greeks{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chartbox svg{height:240px}
+}
 @media (max-width:720px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stat .v{font-size:18px}
@@ -156,6 +212,9 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
     <h1>美股篩選</h1><span class="mark">US Stock Screener</span>
     <span class="asof" id="asof"></span>
   </div>
+  <div class="seg views" id="viewSeg" role="tablist" aria-label="功能">
+    <button data-v="screen" aria-pressed="true">股票篩選</button><button data-v="options">選擇權策略</button>
+  </div>
   <div class="actions">
     <a class="btn" href="index.html" title="回平面設計大師"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl">首頁</span></a>
     <button class="btn" id="btnImport" title="匯入自己的資料（CSV 或 JSON）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span class="lbl">匯入</span></button>
@@ -164,6 +223,7 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
   </div>
 </header>
 
+<div id="screenView">
 <nav class="presets" id="presets" aria-label="選股策略"></nav>
 
 <section class="stats" id="stats" aria-label="篩選結果摘要"></section>
@@ -187,6 +247,51 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
   <div class="seg" id="colSeg" role="group" aria-label="欄位組合"></div>
 </div>
 <div class="table-wrap"><table id="tbl"><thead></thead><tbody></tbody></table><div class="more" id="more" hidden><button class="btn sm" id="btnMore">顯示更多</button></div></div>
+</div>
+<section id="optView" hidden aria-label="選擇權策略評估">
+<section class="panel">
+  <div class="opt-in">
+    <label class="fld sym"><span>標的代號</span><input id="oSym" list="symList" placeholder="例如 AAPL" autocomplete="off" spellcheck="false"></label>
+    <label class="fld"><span>股價 $</span><input id="oS" data-k="S" inputmode="decimal"></label>
+    <label class="fld" title="市場從選擇權價格反推的未來波動，用來算權利金理論價"><span>隱含波動率 IV %</span><input id="oIV" data-k="iv" inputmode="decimal"></label>
+    <label class="fld"><span>到期天數</span><input id="oDte" data-k="dte" inputmode="numeric"></label>
+    <label class="fld"><span>無風險利率 %</span><input id="oR" data-k="r" inputmode="decimal"></label>
+    <label class="fld"><span>殖利率 %</span><input id="oQ" data-k="q" inputmode="decimal"></label>
+    <label class="fld" title="你認為到期前股價實際會怎麼波動；預設為過去一年的實際波動。用來算獲利機率與期望值"><span>你預期的波動 %</span><input id="oEV" data-k="ev" inputmode="decimal"></label>
+    <label class="fld" title="你認為股價一年會漲多少（含息）；預設等於無風險利率，也就是不預設方向"><span>你預期的年漲幅 %</span><input id="oMu" data-k="mu" inputmode="decimal"></label>
+  </div>
+  <datalist id="symList"></datalist>
+  <p class="hint" id="oHint"></p>
+</section>
+<div class="viewbar">
+  <span class="count">策略比較：每口 100 股，履約價依波動自動挑選，權利金為理論價</span>
+  <div class="seg" id="oMoodSeg" role="group" aria-label="你的看法">
+    <button data-v="">全部</button><button data-v="看漲">看漲</button><button data-v="看跌">看跌</button><button data-v="盤整">盤整</button><button data-v="大波動">大波動</button>
+  </div>
+</div>
+<div class="table-wrap"><table id="oTbl" class="otbl"><thead></thead><tbody></tbody></table></div>
+<section class="panel ostrat" id="oDetail">
+  <div class="ohead"><h2 id="oName"></h2><p class="note" id="oDesc"></p></div>
+  <div class="ogrid">
+    <div>
+      <table class="legs" id="oLegs"><thead><tr><th>類型</th><th>買／賣</th><th>口數</th><th>履約價</th><th>權利金</th><th>理論價</th><th><span class="sr" aria-label="移除"></span></th></tr></thead><tbody></tbody></table>
+      <div class="legbtns">
+        <button class="btn sm" id="oAddLeg">＋ 加一腳</button>
+        <button class="btn sm" id="oTheo" title="把手動輸入的權利金改回理論價">權利金改回理論價</button>
+        <button class="btn sm" id="oReset">重設此策略</button>
+      </div>
+      <p class="hint">權利金可以改成券商報價（買進填賣價、賣出填買價），評估會更準。股票那一腳的「權利金」欄是買進成本。</p>
+      <div class="greeks" id="oGreeks"></div>
+    </div>
+    <div>
+      <div class="tiles" id="oTiles"></div>
+      <div class="legend"><span><i></i>到期損益</span><span><i class="now"></i>今天損益（股價立刻變動時）</span><span><i class="band"></i>±1 個標準差（依你預期的波動）</span></div>
+      <div class="chartbox" id="oChart"></div>
+    </div>
+  </div>
+</section>
+<p class="disclaimer">權利金理論價以 Black-Scholes 模型計算（歐式、連續殖利率），美股個股選擇權是美式，實際報價會因買賣價差、提前履約、股息日與波動率微笑而不同。獲利機率與期望值是用你預期的波動和漲幅估計的對數常態分布，不是預測；「期望值」只在你的預期和市場隱含波動不同時才不為零。賣出選擇權可能損失遠大於收到的權利金，無上限風險的策略需要保證金帳戶。<b>僅供研究與學習，不構成投資建議。</b></p>
+</section>
 
 <p class="disclaimer">資料來源：Yahoo Finance（每個美股交易日收盤後自動更新，成分股名單取自 Wikipedia）。報酬率已含股息再投入，3 年、5 年為年化；ETF 的「市值」欄是資產規模。評分是同一批股票裡的百分位排名（0–100），只代表相對位置。<b>本工具僅供研究與學習，不構成投資建議</b>；資料可能延遲或有誤，下單前請以券商與公司財報為準，並評估自己的風險承受度。</p>
 </div>
@@ -212,6 +317,7 @@ const M = {
   vol:{l:'年化波動',u:'%',d:1,dir:-1}, maxDD:{l:'5年最大回檔',u:'%',d:1,dir:1},
   upside:{l:'目標價空間',u:'%',d:1,dir:1,h:'分析師平均目標價相對現價'}, rating:{l:'分析師評等',d:1,dir:-1,h:'1 強力買進 … 5 賣出'},
   expense:{l:'內扣費用',u:'%',d:2,dir:-1,h:'ETF 每年的總費用率'},
+  iv:{l:'隱含波動率',u:'%',d:1,h:'最近月份價平選擇權的 IV'}, ivHv:{l:'IV／實際波動',d:2,h:'>1 代表選擇權比股票過去一年的實際波動更貴，對賣方有利'},
   sValue:{l:'價值分',d:0,dir:1}, sDiv:{l:'股息分',d:0,dir:1}, sGrowth:{l:'成長分',d:0,dir:1}, sQuality:{l:'品質分',d:0,dir:1},
 };
 const SCORES = {
@@ -228,6 +334,7 @@ const COLSETS = {
   '品質':['roe','margin','grossMargin','de','currentRatio','vol','sQuality'],
   '報酬':['price','r1m','rYtd','r1y','r3y','r5y','fromHigh','maxDD'],
   'ETF':['price','sector','mcap','expense','divYield','r1y','r3y','r5y'],
+  '選擇權':['price','iv','vol','ivHv','divYield','beta','fromHigh','r1m'],
 };
 const PRESETS = [
   {id:'all',name:'全部',sub:'不設條件',type:'all',rules:[],sort:['mcap',-1],cols:'概覽'},
@@ -238,6 +345,8 @@ const PRESETS = [
   {id:'quality',name:'品質股',sub:'高 ROE、低負債',type:'stock',rules:[['roe',15,null],['margin',15,null],['de',null,1]],sort:['sQuality',-1],cols:'品質'},
   {id:'etfIdx',name:'ETF：低成本',sub:'內扣 ≤0.2%',type:'etf',rules:[['expense',null,0.2]],sort:['mcap',-1],cols:'ETF'},
   {id:'etfDiv',name:'ETF：高股息',sub:'殖利率 ≥3%',type:'etf',rules:[['divYield',3,null]],sort:['divYield',-1],cols:'ETF'},
+  {id:'optSell',name:'選擇權：賣方',sub:'IV 高於實際波動',type:'all',rules:[['ivHv',1.2,null],['mcap',10,null]],sort:['ivHv',-1],cols:'選擇權'},
+  {id:'optBuy',name:'選擇權：買方',sub:'IV 低於實際波動',type:'all',rules:[['ivHv',null,0.85],['mcap',10,null]],sort:['ivHv',1],cols:'選擇權'},
   {id:'watch',name:'★ 我的追蹤',sub:'加星號的股票',type:'all',rules:[],sort:['mcap',-1],cols:'概覽',watch:true},
 ];
 
@@ -419,6 +528,7 @@ function openDetail(sym){
     + grp('成長與獲利', ['revGrowth','epsGrowth','roe','margin','grossMargin','de','currentRatio'])
     + grp('報酬與風險（含息）', ['r1m','rYtd','r1y','r3y','r5y','vol','maxDD'])
     + `<h3>延伸閱讀</h3><div class="links">
+        <a class="btn sm primary" href="#options=${esc(r.symbol)}">選擇權策略評估</a>
         <a class="btn sm" href="https://finance.yahoo.com/quote/${y}" target="_blank" rel="noopener">Yahoo Finance</a>
         ${r.type==='stock'?`<a class="btn sm" href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker=${y}&type=10-K" target="_blank" rel="noopener">SEC 年報</a>`:''}
         <a class="btn sm" href="https://finviz.com/quote.ashx?t=${y}" target="_blank" rel="noopener">Finviz</a>
@@ -479,8 +589,10 @@ function loadItems(items, meta, label){
   DATA = items; META = meta || {};
   computeScores(DATA);
   const when = META.generatedAt ? new Date(META.generatedAt) : null;
+  $('#symList').innerHTML = DATA.map(it => `<option value="${esc(it.symbol)}">${esc(it.name)}</option>`).join('');
   $('#asof').textContent = label || (when ? `資料更新：${when.toLocaleString('zh-TW',{dateStyle:'medium',timeStyle:'short'})}` : '');
   update();
+  if (!$('#optView').hidden){ oLoadSymbol(O.sym); oRender() }
 }
 $('#btnImport').onclick = () => $('#file').click();
 $('#file').onchange = async e => {
@@ -515,7 +627,7 @@ function toggleStar(sym){
 }
 $('#presets').onclick = e => { const b = e.target.closest('.preset'); if (b) applyPreset(b.dataset.id) };
 $('#typeSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.type = b.dataset.v;
-  if (S.type === 'etf' && !['ETF','報酬','概覽'].includes(S.cols)) S.cols = 'ETF';
+  if (S.type === 'etf' && !['ETF','報酬','概覽','選擇權'].includes(S.cols)) S.cols = 'ETF';
   if (S.type === 'stock' && S.cols === 'ETF') S.cols = '概覽'; update() };
 $('#colSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.cols = b.dataset.v; update() };
 $('#sector').onchange = e => { S.sector = e.target.value; update() };
@@ -547,6 +659,305 @@ $('#dlg').addEventListener('click', e => {
   const st = e.target.closest('[data-star]'); if (st) toggleStar(st.dataset.star);
 });
 
+// ---------- options strategy evaluator ----------
+// legs: [type, signed contracts, strike offset in standard deviations of the move to expiry]
+const OPT = [
+  {id:'covered', n:'備兌買權', en:'Covered Call', mood:['盤整','看漲'], d:'持有 100 股並賣出價外買權收權利金；小漲或盤整最有利，大漲時獲利被鎖在履約價，下跌風險和持股差不多。', legs:[['stock',1],['call',-1,.5]]},
+  {id:'csp', n:'現金擔保賣權', en:'Cash-Secured Put', mood:['盤整','看漲'], d:'賣出價外賣權並準備好履約現金；股價沒跌破履約價就賺權利金，跌破就以較低價格買進股票。', legs:[['put',-1,-.5]]},
+  {id:'protective', n:'保護性賣權', en:'Protective Put', mood:['看漲'], d:'持股同時買賣權當保險；保留上漲空間，跌到履約價以下的損失被鎖住，代價是權利金。', legs:[['stock',1],['put',1,-.5]]},
+  {id:'collar', n:'領口策略', en:'Collar', mood:['看漲','盤整'], d:'持股、買賣權保護下檔、再賣買權支付保費；上下都被限制，適合想保住獲利的持股。', legs:[['stock',1],['put',1,-.5],['call',-1,.5]]},
+  {id:'longCall', n:'買進買權', en:'Long Call', mood:['看漲'], d:'用小額權利金押股價大漲；最多賠掉權利金，獲利沒有上限，但時間價值每天流失。', legs:[['call',1,0]]},
+  {id:'longPut', n:'買進賣權', en:'Long Put', mood:['看跌'], d:'押股價大跌，最多賠掉權利金；也可以當作持股的保險。', legs:[['put',1,0]]},
+  {id:'bullCall', n:'多頭買權價差', en:'Bull Call Spread', mood:['看漲'], d:'買價平買權、賣較高履約價買權降低成本；看溫和上漲，獲利與虧損都有上限。', legs:[['call',1,0],['call',-1,.5]]},
+  {id:'bearPut', n:'空頭賣權價差', en:'Bear Put Spread', mood:['看跌'], d:'買價平賣權、賣較低履約價賣權降低成本；看溫和下跌，風險有限。', legs:[['put',1,0],['put',-1,-.5]]},
+  {id:'bullPut', n:'多頭賣權價差（收權利金）', en:'Bull Put Credit Spread', mood:['看漲','盤整'], d:'賣價外賣權、買更低的賣權保護；只要股價不跌破就賺權利金，最大虧損有上限。', legs:[['put',-1,-.5],['put',1,-1]]},
+  {id:'bearCall', n:'空頭買權價差（收權利金）', en:'Bear Call Credit Spread', mood:['看跌','盤整'], d:'賣價外買權、買更高的買權保護；只要股價不漲破就賺權利金。', legs:[['call',-1,.5],['call',1,1]]},
+  {id:'condor', n:'鐵兀鷹', en:'Iron Condor', mood:['盤整'], d:'同時做多頭賣權價差與空頭買權價差；股價留在兩個賣出履約價之間就賺，風險兩邊都有上限。', legs:[['put',1,-1],['put',-1,-.5],['call',-1,.5],['call',1,1]]},
+  {id:'butterfly', n:'買權蝶式', en:'Call Butterfly', mood:['盤整'], d:'成本低，股價到期剛好停在中間履約價時獲利最大；適合預期股價幾乎不動。', legs:[['call',1,-.5],['call',-2,0],['call',1,.5]]},
+  {id:'straddle', n:'買進跨式', en:'Long Straddle', mood:['大波動'], d:'同時買價平買權與賣權；不管大漲大跌都賺，股價不動就虧，適合財報或事件前。', legs:[['call',1,0],['put',1,0]]},
+  {id:'strangle', n:'買進勒式', en:'Long Strangle', mood:['大波動'], d:'買價外買權與賣權，成本比跨式低，但需要更大的波動才會獲利。', legs:[['call',1,.5],['put',1,-.5]]},
+  {id:'shortStrangle', n:'賣出勒式', en:'Short Strangle', mood:['盤整'], d:'賣出價外買權與賣權收雙邊權利金；股價留在區間內就賺，但大漲大跌的虧損沒有上限。', legs:[['call',-1,1],['put',-1,-1]]},
+];
+const O = {sym:'', S:100, iv:30, dte:30, r:4, q:0, ev:30, mu:4, mood:'', strat:'covered', legs:[], custom:false, ivSrc:''};
+
+const ncdf = x => {const t = 1/(1+0.2316419*Math.abs(x)), d = 0.3989422804*Math.exp(-x*x/2);
+  const p = d*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429)))); return x > 0 ? 1-p : p};
+const npdf = x => 0.3989422804*Math.exp(-x*x/2);
+function bs(type, S, K, T, r, q, v){
+  if (type === 'stock') return {p:S, delta:1, gamma:0, theta:0, vega:0};
+  if (T <= 0 || v <= 0 || S <= 0){
+    const p = Math.max(type === 'call' ? S-K : K-S, 0);
+    return {p, delta: type === 'call' ? (S > K ? 1 : 0) : (S < K ? -1 : 0), gamma:0, theta:0, vega:0};
+  }
+  const sq = v*Math.sqrt(T), d1 = (Math.log(S/K)+(r-q+v*v/2)*T)/sq, d2 = d1-sq, eq = Math.exp(-q*T), er = Math.exp(-r*T);
+  const common = {gamma: eq*npdf(d1)/(S*sq), vega: S*eq*npdf(d1)*Math.sqrt(T)/100};
+  if (type === 'call') return {...common, p: S*eq*ncdf(d1)-K*er*ncdf(d2), delta: eq*ncdf(d1),
+    theta: (-S*eq*npdf(d1)*v/(2*Math.sqrt(T)) - r*K*er*ncdf(d2) + q*S*eq*ncdf(d1))/365};
+  return {...common, p: K*er*ncdf(-d2)-S*eq*ncdf(-d1), delta: -eq*ncdf(-d1),
+    theta: (-S*eq*npdf(d1)*v/(2*Math.sqrt(T)) + r*K*er*ncdf(-d2) - q*S*eq*ncdf(-d1))/365};
+}
+const oT = () => Math.max(O.dte, 0)/365;
+const theo = (leg, S = O.S, T = oT()) => bs(leg.type, S, leg.K, T, O.r/100, O.q/100, O.iv/100);
+const payoff = (leg, x) => leg.type === 'stock' ? x : leg.type === 'call' ? Math.max(x-leg.K, 0) : Math.max(leg.K-x, 0);
+const plAt = (legs, x) => legs.reduce((a, l) => a + l.qty*(payoff(l, x)-l.prem)*100, 0);
+const plNow = (legs, x) => legs.reduce((a, l) => a + l.qty*(theo(l, x).p-l.prem)*100, 0);
+const strikeStep = S => S < 25 ? .5 : S < 100 ? 1 : S < 250 ? 2.5 : S < 500 ? 5 : 10;
+
+function defaultLegs(st){
+  const step = strikeStep(O.S), sd = O.iv/100*Math.sqrt(Math.max(oT(), 1/365));
+  const K = {}; K[0] = Math.max(step, Math.round(O.S/step)*step);
+  for (const dir of [1, -1]){ // strikes at ±0.5σ and ±1σ, at least one step apart
+    let prev = K[0];
+    for (const off of [.5, 1]){
+      let k = Math.round(O.S*Math.exp(dir*off*sd)/step)*step;
+      if (dir > 0 ? k < prev+step : k > prev-step) k = prev + dir*step;
+      K[dir*off] = Math.max(step, k); prev = K[dir*off];
+    }
+  }
+  return st.legs.map(([type, qty, off]) => type === 'stock' ? {type, qty, K:null, prem:O.S, auto:true}
+    : {type, qty, K:K[off], prem:0, auto:true}).map(priceLeg);
+}
+function priceLeg(l){ if (l.auto) l.prem = l.type === 'stock' ? O.S : Math.round(theo(l).p*100)/100; return l }
+
+function analyze(legs){
+  const Tm = Math.max(oT(), 1/365), ks = [...new Set(legs.filter(l => l.type !== 'stock').map(l => l.K))].sort((a,b) => a-b);
+  const hiX = Math.max(O.S, ...ks)*4 + 10, pts = [0, ...ks.filter(k => k > 0), hiX];
+  const vals = pts.map(x => plAt(legs, x));
+  const slopeHi = legs.reduce((a, l) => a + (l.type === 'put' ? 0 : l.qty*100), 0);
+  const maxP = slopeHi > 1e-9 ? Infinity : Math.max(...vals), maxL = slopeHi < -1e-9 ? -Infinity : Math.min(...vals);
+  const bes = [];
+  for (let i = 0; i < pts.length-1; i++){
+    const a = vals[i], b = vals[i+1];
+    if ((a < 0 && b > 0) || (a > 0 && b < 0)) bes.push(pts[i] + (-a)*(pts[i+1]-pts[i])/(b-a));
+  }
+  const last = vals[vals.length-1];
+  if (slopeHi && last*slopeHi < 0) bes.push(hiX - last/slopeHi);
+  const sp = Math.max(O.ev, .1)/100, m = (O.mu/100 - O.q/100 - sp*sp/2)*Tm, s = sp*Math.sqrt(Tm);
+  const cdf = x => x <= 0 ? 0 : !isFinite(x) ? 1 : ncdf((Math.log(x/O.S)-m)/s);
+  const bounds = [0, ...bes, Infinity];
+  let pop = 0;
+  for (let i = 0; i < bounds.length-1; i++){
+    const a = bounds[i], b = bounds[i+1], mid = isFinite(b) ? (a+b)/2 : a*1.5 + O.S;
+    if (plAt(legs, mid) > 0) pop += cdf(b) - cdf(a);
+  }
+  let ev = 0; const dz = .02;
+  for (let z = -6; z <= 6; z += dz) ev += plAt(legs, O.S*Math.exp(m + s*z))*npdf(z)*dz;
+  const cost = legs.reduce((a, l) => a + l.qty*l.prem*100, 0); // >0 you pay, <0 you collect
+  const cap = isFinite(maxL) && maxL < 0 ? -maxL : null;
+  const g = {delta:0, gamma:0, theta:0, vega:0};
+  for (const l of legs){ const t = theo(l); for (const k in g) g[k] += l.qty*100*t[k] }
+  return {cost, maxP, maxL, bes, pop, ev, cap, roiMax: cap && isFinite(maxP) ? maxP/cap : null,
+          annual: cap ? ev/cap*365/Math.max(O.dte, 1) : null, g};
+}
+
+const money = (v, sign) => {
+  if (v === Infinity) return '無上限'; if (v === -Infinity) return '無上限';
+  if (!isFinite(v)) return '—';
+  const s = '$' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0});
+  return sign && v ? (v > 0 ? '+' : '−') + s : (v < 0 ? '−' : '') + s;
+};
+const pct = (v, d = 0) => v == null || !isFinite(v) ? '—' : (v*100).toFixed(d) + '%';
+const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+const costTxt = c => Math.abs(c) < .005 ? '$0' : c > 0 ? `付 ${money(c)}` : `收 ${money(-c)}`;
+const beTxt = b => b.length ? b.map(x => '$' + x.toFixed(2)).join('、') : '—';
+
+function oSetInputs(){
+  for (const [id, k] of [['oS','S'],['oIV','iv'],['oDte','dte'],['oR','r'],['oQ','q'],['oEV','ev'],['oMu','mu']])
+    if (document.activeElement?.id !== id) $('#'+id).value = +(+O[k]).toFixed(k === 'S' ? 2 : 1);
+  if (document.activeElement?.id !== 'oSym') $('#oSym').value = O.sym;
+  for (const b of document.querySelectorAll('#oMoodSeg button')) b.setAttribute('aria-pressed', b.dataset.v === O.mood);
+}
+function oHint(){
+  const r = DATA.find(x => x.symbol === O.sym);
+  let t = O.sym && !r ? `資料裡沒有 ${O.sym}，請自己填股價和波動率。` : '';
+  if (r) t = O.ivSrc;
+  const ratio = O.iv / O.ev;
+  let mood = '';
+  if (isFinite(ratio) && O.ev > 0){
+    mood = ratio >= 1.15 ? `IV 比你預期的波動高 ${((ratio-1)*100).toFixed(0)}%：選擇權相對貴，收權利金（賣方）的策略期望值較好。`
+      : ratio <= 0.87 ? `IV 比你預期的波動低 ${((1-ratio)*100).toFixed(0)}%：選擇權相對便宜，買方策略的期望值較好。`
+      : 'IV 和你預期的波動差不多：選擇權價格大致合理，期望值主要取決於你對方向的看法。';
+  }
+  $('#oHint').innerHTML = esc(t) + (mood ? `<br><span class="mood">${esc(mood)}</span>` : '');
+}
+function oTable(){
+  $('#oTbl thead').innerHTML = '<tr><th>策略</th><th>適合看法</th><th>建立成本</th><th>最大獲利</th><th>最大虧損</th><th>損益兩平</th><th title="依你預期的波動與漲幅估計">獲利機率</th><th title="依你預期的波動與漲幅估計，每組">期望值</th><th title="期望值 ÷ 最大虧損，換算成一年">年化期望報酬</th></tr>';
+  $('#oTbl tbody').innerHTML = OPT.map(st => {
+    const legs = st.id === O.strat && !O.custom ? O.legs : defaultLegs(st), a = analyze(legs);
+    const dim = O.mood && !st.mood.includes(O.mood);
+    return `<tr data-st="${st.id}" class="${st.id === O.strat ? 'sel' : ''} ${dim ? 'dim' : ''}">
+      <td><b>${esc(st.n)}</b><span class="en">${esc(st.en)}</span></td><td>${st.mood.join('、')}</td>
+      <td>${costTxt(a.cost)}</td><td class="up">${money(a.maxP)}</td><td class="down">${money(a.maxL)}</td>
+      <td>${beTxt(a.bes)}</td><td>${pct(a.pop)}</td><td class="${cls(a.ev)}">${money(a.ev, true)}</td>
+      <td class="${cls(a.annual)}">${a.annual == null ? '<span class="na">—</span>' : (a.annual > 0 ? '+' : '') + pct(a.annual)}</td></tr>`;
+  }).join('');
+}
+function oDetail(){ oLegsTable(); oResults() }
+function oLegsTable(){
+  const ae = document.activeElement, keep = ae && ae.closest('#oLegs') ? [ae.dataset.i, ae.dataset.f] : null;
+  $('#oLegs tbody').innerHTML = O.legs.map((l, i) => {
+    const th = l.type === 'stock' ? null : theo(l).p;
+    return `<tr>
+      <td><select data-i="${i}" data-f="type" aria-label="類型"><option value="call" ${l.type==='call'?'selected':''}>買權</option><option value="put" ${l.type==='put'?'selected':''}>賣權</option><option value="stock" ${l.type==='stock'?'selected':''}>股票</option></select></td>
+      <td><select data-i="${i}" data-f="side" aria-label="買或賣"><option value="1" ${l.qty>0?'selected':''}>買</option><option value="-1" ${l.qty<0?'selected':''}>賣</option></select></td>
+      <td><input data-i="${i}" data-f="n" value="${Math.abs(l.qty)}" inputmode="numeric" aria-label="口數"></td>
+      <td>${l.type === 'stock' ? '<span class="na">—</span>' : `<input data-i="${i}" data-f="K" value="${l.K}" inputmode="decimal" aria-label="履約價">`}</td>
+      <td><input data-i="${i}" data-f="prem" value="${l.prem.toFixed(2)}" inputmode="decimal" aria-label="權利金" class="${l.auto ? '' : 'custom'}" title="${l.auto ? '理論價' : '手動輸入'}"></td>
+      <td class="th">${th == null ? '' : th.toFixed(2)}</td>
+      <td><button class="x" data-del="${i}" aria-label="移除這一腳">×</button></td></tr>`;
+  }).join('');
+  if (keep) document.querySelector(`#oLegs [data-i="${keep[0]}"][data-f="${keep[1]}"]`)?.focus();
+}
+function oResults(){
+  const st = OPT.find(s => s.id === O.strat);
+  $('#oName').textContent = (O.custom ? '自訂（由「' + st.n + '」修改）' : st.n) + (O.sym ? ` · ${O.sym}` : '');
+  $('#oDesc').textContent = O.custom ? '已手動修改；表格裡的「' + st.n + '」仍是預設組合。' : st.d;
+  const a = analyze(O.legs);
+  const tile = (k, v, c = '', t = '') => `<div class="tile" ${t ? `title="${esc(t)}"` : ''}><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`;
+  $('#oTiles').innerHTML = [
+    tile('建立成本', costTxt(a.cost)), tile('最大獲利', money(a.maxP), 'up'), tile('最大虧損', money(a.maxL), 'down'),
+    tile('損益兩平', beTxt(a.bes)),
+    tile('獲利機率', pct(a.pop), '', '到期時賺錢的機率，依你預期的波動與漲幅估計'),
+    tile('期望值', money(a.ev, true), cls(a.ev), '各種到期股價的損益乘上機率後加總'),
+    tile('報酬／風險', a.roiMax == null ? '—' : a.roiMax.toFixed(2) + ' 倍', '', '最大獲利 ÷ 最大虧損'),
+    tile('年化期望報酬', a.annual == null ? '—' : (a.annual > 0 ? '+' : '') + pct(a.annual, 1), cls(a.annual), '期望值 ÷ 最大虧損（所需資金），換算成一年'),
+  ].join('');
+  $('#oGreeks').innerHTML = [
+    tile('Delta', a.g.delta.toFixed(0) + ' 股', '', '股價漲 $1 時部位約賺多少，等同持有幾股'),
+    tile('Gamma', a.g.gamma.toFixed(2), '', '股價漲 $1 時 Delta 的變化'),
+    tile('Theta／天', money(a.g.theta, true), cls(a.g.theta), '其他不變時每過一天的損益（時間價值）'),
+    tile('Vega／1%', money(a.g.vega, true), cls(a.g.vega), 'IV 上升 1 個百分點時的損益'),
+  ].join('');
+  oChart(a);
+}
+
+function niceTicks(lo, hi, n = 4){
+  const raw = (hi-lo)/n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw/p;
+  const st = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10)*p, out = [];
+  for (let v = Math.ceil(lo/st)*st; v <= hi + 1e-9; v += st) out.push(+v.toFixed(10));
+  return out;
+}
+function oChart(a){
+  const box = $('#oChart'), W = Math.max(box.clientWidth || 600, 280), H = W < 520 ? 240 : 300;
+  const L = 62, R = 14, Tp = 12, B = 30, legs = O.legs;
+  if (!legs.length){ box.innerHTML = '<p class="note">加一腳開始。</p>'; return }
+  const s = O.ev/100*Math.sqrt(Math.max(oT(), 1/365)), ks = legs.filter(l => l.type !== 'stock').map(l => l.K);
+  const sv = Math.max(s, .08);
+  let x0 = Math.min(O.S*Math.exp(-2.8*sv), ...ks.map(k => k*.92)), x1 = Math.max(O.S*Math.exp(2.8*sv), ...ks.map(k => k*1.08));
+  x0 = Math.max(0, x0);
+  const N = 220, xs = Array.from({length:N+1}, (_, i) => x0 + (x1-x0)*i/N);
+  const ye = xs.map(x => plAt(legs, x)), yn = xs.map(x => plNow(legs, x));
+  let y0 = Math.min(0, ...ye, ...yn), y1 = Math.max(0, ...ye, ...yn); const pad = (y1-y0)*.08 || 50; y0 -= pad; y1 += pad;
+  const X = x => L + (x-x0)/(x1-x0)*(W-L-R), Y = y => Tp + (y1-y)/(y1-y0)*(H-Tp-B);
+  const path = ys => xs.map((x, i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join('');
+  const area = path(ye) + `L${X(x1).toFixed(1)},${Y(0).toFixed(1)}L${X(x0).toFixed(1)},${Y(0).toFixed(1)}Z`;
+  const lo1 = O.S*Math.exp(-s), hi1 = O.S*Math.exp(s);
+  const yt = niceTicks(y0, y1), xt = niceTicks(x0, x1, W < 520 ? 4 : 6);
+  const kfmt = v => Math.abs(v) >= 1e4 ? (v/1000).toFixed(0) + 'k' : Math.abs(v) >= 1000 ? (v/1000).toFixed(1) + 'k' : v.toFixed(0);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="到期損益圖">
+    <defs><clipPath id="cUp"><rect x="0" y="0" width="${W}" height="${Y(0)}"/></clipPath><clipPath id="cDn"><rect x="0" y="${Y(0)}" width="${W}" height="${H}"/></clipPath></defs>
+    <rect x="${X(Math.max(lo1, x0))}" y="${Tp}" width="${Math.max(0, X(Math.min(hi1, x1))-X(Math.max(lo1, x0)))}" height="${H-Tp-B}" fill="var(--accent-soft)" opacity=".55"/>
+    ${yt.map(v => `<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${v < 0 ? '−' : ''}$${kfmt(Math.abs(v))}</text>`).join('')}
+    ${xt.map(v => `<text x="${X(v)}" y="${H-10}" text-anchor="middle">$${v.toFixed(v < 10 ? 1 : 0)}</text>`).join('')}
+    <path d="${area}" fill="var(--up)" opacity=".16" clip-path="url(#cUp)"/>
+    <path d="${area}" fill="var(--down)" opacity=".16" clip-path="url(#cDn)"/>
+    <line x1="${L}" x2="${W-R}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)" stroke-width="1"/>
+    <line x1="${X(O.S)}" x2="${X(O.S)}" y1="${Tp}" y2="${H-B}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>
+    <text x="${X(O.S)+4}" y="${Tp+10}">現價 $${O.S.toFixed(2)}</text>
+    <path d="${path(yn)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="${path(ye)}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    ${a.bes.filter(b => b > x0 && b < x1).map(b => `<circle cx="${X(b)}" cy="${Y(0)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/><text x="${X(b)}" y="${Y(0) + (Y(0) > H-B-20 ? -8 : 16)}" text-anchor="middle">$${b.toFixed(2)}</text>`).join('')}
+    <g id="oHover" visibility="hidden"><line id="oHl" y1="${Tp}" y2="${H-B}" stroke="var(--ink)" stroke-width="1" opacity=".4"/>
+      <circle id="oHe" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/><circle id="oHn" r="4" fill="var(--muted)" stroke="var(--panel)" stroke-width="2"/></g>
+    <rect id="oHit" x="${L}" y="${Tp}" width="${W-L-R}" height="${H-Tp-B}" fill="transparent"/>
+  </svg><div class="tip" id="oTip" hidden></div>`;
+  const hit = box.querySelector('#oHit'), tip = box.querySelector('#oTip'), g = box.querySelector('#oHover');
+  const move = e => {
+    const r = box.querySelector('svg').getBoundingClientRect(), px = (e.clientX - r.left)*W/r.width;
+    const x = x0 + (px-L)/(W-L-R)*(x1-x0); if (x < x0 || x > x1) return;
+    const e1 = plAt(legs, x), n1 = plNow(legs, x);
+    g.setAttribute('visibility', 'visible');
+    box.querySelector('#oHl').setAttribute('x1', X(x)); box.querySelector('#oHl').setAttribute('x2', X(x));
+    const he = box.querySelector('#oHe'), hn = box.querySelector('#oHn');
+    he.setAttribute('cx', X(x)); he.setAttribute('cy', Y(e1)); hn.setAttribute('cx', X(x)); hn.setAttribute('cy', Y(n1));
+    tip.hidden = false;
+    tip.innerHTML = `<b>股價 $${x.toFixed(2)}（${x >= O.S ? '+' : ''}${((x/O.S-1)*100).toFixed(1)}%）</b>到期 <span class="${cls(e1)}">${money(e1, true)}</span><br>今天 <span class="${cls(n1)}">${money(n1, true)}</span>`;
+    const tx = X(x)*r.width/W, tw = tip.offsetWidth;
+    tip.style.left = (tx + 12 + tw > r.width ? tx - tw - 12 : tx + 12) + 'px'; tip.style.top = '8px';
+  };
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+  hit.addEventListener('pointerleave', () => { g.setAttribute('visibility', 'hidden'); tip.hidden = true });
+}
+function oRender(){ oSetInputs(); oHint(); oTable(); oDetail() }
+function oLoadStrategy(id){ const st = OPT.find(s => s.id === id) || OPT[0]; O.strat = st.id; O.custom = false; O.legs = defaultLegs(st) }
+function oLoadSymbol(sym){
+  sym = (sym || '').trim().toUpperCase(); O.sym = sym;
+  const r = DATA.find(x => x.symbol === sym);
+  if (r && isNum(r.price)){
+    O.S = r.price; O.q = isNum(r.divYield) ? r.divYield : 0;
+    O.iv = isNum(r.iv) ? r.iv : isNum(r.vol) ? r.vol : 30; O.ev = isNum(r.vol) ? r.vol : O.iv;
+    O.dte = r.ivDte || 30;
+    O.ivSrc = isNum(r.iv) ? `IV ${r.iv}% 取自 Yahoo 最近月份（${r.ivDte} 天）價平選擇權；預期波動預設為過去一年實際波動 ${isNum(r.vol) ? r.vol + '%' : '（無資料，暫用 IV）'}。資料日期 ${r.asOf || '—'}。`
+      : `沒有選擇權報價資料，IV 暫用過去一年實際波動 ${isNum(r.vol) ? r.vol + '%' : '30%'}，建議改成券商顯示的 IV。`;
+  }
+  oLoadStrategy(O.strat);
+}
+function setView(v, sym){
+  const opt = v === 'options';
+  $('#screenView').hidden = opt; $('#optView').hidden = !opt;
+  for (const b of document.querySelectorAll('#viewSeg button')) b.setAttribute('aria-pressed', b.dataset.v === v);
+  $('#btnExport').hidden = opt;
+  if (opt){
+    if (sym != null && sym !== O.sym) oLoadSymbol(sym);
+    else if (!O.legs.length) oLoadSymbol(O.sym || (DATA.find(x => x.symbol === 'SPY') ? 'SPY' : DATA[0]?.symbol || ''));
+    oRender();
+  }
+}
+function route(){
+  const m = location.hash.match(/^#options(?:=([A-Za-z.\-]+))?/);
+  if ($('#dlg').open) $('#dlg').close();
+  setView(m ? 'options' : 'screen', m && m[1] ? m[1].toUpperCase() : null);
+}
+window.addEventListener('hashchange', route);
+$('#viewSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  location.hash = b.dataset.v === 'options' ? 'options' + (O.sym ? '=' + O.sym : '') : '' };
+$('#oSym').addEventListener('change', e => { const v = e.target.value.trim().toUpperCase(); if (v) location.hash = 'options=' + v });
+$('#optView').addEventListener('input', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  const n = Number(e.target.value); if (e.target.value.trim() === '' || !isFinite(n) || n < 0) return;
+  O[k] = n; for (const l of O.legs) priceLeg(l); oHint(); oTable(); oDetail();
+});
+$('#oMoodSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; O.mood = b.dataset.v; oSetInputs(); oTable() };
+$('#oTbl').addEventListener('click', e => { const tr = e.target.closest('tr[data-st]'); if (!tr) return;
+  oLoadStrategy(tr.dataset.st); oTable(); oDetail();
+  if (innerWidth < 900) $('#oDetail').scrollIntoView({behavior:'smooth', block:'start'}) });
+function legEdit(e){
+  const i = e.target.dataset.i, f = e.target.dataset.f; if (i == null || !f) return;
+  const l = O.legs[i], v = e.target.value;
+  if (f === 'type'){ l.type = v; l.auto = true; if (v !== 'stock' && !l.K) l.K = Math.round(O.S/strikeStep(O.S))*strikeStep(O.S); }
+  else if (f === 'side') l.qty = Math.abs(l.qty)*Number(v);
+  else { const n = Number(v); if (v.trim() === '' || !isFinite(n) || n < 0) return;
+    if (f === 'n'){ if (!n) return; l.qty = Math.sign(l.qty)*n }
+    else if (f === 'K'){ if (!n) return; l.K = n }
+    else if (f === 'prem'){ l.prem = n; l.auto = false } }
+  priceLeg(l); O.custom = true; oTable();
+  if (e.type === 'input'){ // keep the caret: refresh only this row's computed cells
+    const tr = e.target.closest('tr'), th = l.type === 'stock' ? '' : theo(l).p.toFixed(2);
+    tr.querySelector('.th').textContent = th;
+    const p = tr.querySelector('[data-f="prem"]'); if (p && p !== e.target){ p.value = l.prem.toFixed(2); p.classList.toggle('custom', !l.auto) }
+    if (f === 'prem') e.target.classList.add('custom');
+    oResults();
+  } else oDetail();
+}
+$('#oLegs').addEventListener('change', e => { if (e.target.tagName === 'SELECT') legEdit(e) });
+$('#oLegs').addEventListener('input', e => { if (e.target.tagName === 'INPUT') legEdit(e) });
+$('#oLegs').addEventListener('focusout', e => { if (e.target.tagName === 'INPUT') setTimeout(() => { if (!$('#oLegs').contains(document.activeElement)) oLegsTable() }, 0) });
+$('#oLegs').addEventListener('click', e => { const d = e.target.dataset.del; if (d == null) return; O.legs.splice(+d, 1); O.custom = true; oTable(); oDetail() });
+$('#oAddLeg').onclick = () => { O.legs.push(priceLeg({type:'call', qty:1, K:Math.round(O.S/strikeStep(O.S))*strikeStep(O.S), prem:0, auto:true})); O.custom = true; oTable(); oDetail() };
+$('#oTheo').onclick = () => { for (const l of O.legs){ l.auto = true; priceLeg(l) } oTable(); oDetail() };
+$('#oReset').onclick = () => { oLoadStrategy(O.strat); oTable(); oDetail() };
+let oRT; window.addEventListener('resize', () => { clearTimeout(oRT); oRT = setTimeout(() => { if (!$('#optView').hidden) oChart(analyze(O.legs)) }, 150) });
+
 // ---------- boot ----------
 (function boot(){
   const v = store.get('view', null);
@@ -556,7 +967,8 @@ $('#dlg').addEventListener('click', e => {
   renderPresets(); update();
   fetch('data/stocks.json', {cache:'no-cache'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json() })
     .then(d => loadItems(d.items || [], d.meta))
-    .catch(() => { $('#asof').textContent = '尚未載入資料'; render() });
+    .catch(() => { $('#asof').textContent = '尚未載入資料'; render() })
+    .finally(route);
 })();
 </script>
 </body>

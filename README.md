@@ -55,7 +55,15 @@
 - **評分**：每檔個股算出價值分、股息分、成長分、品質分（0–100，在全部個股中的百分位）；虧損公司的本益比算最差而不是最便宜
 - **欄位組合**：概覽、估值、股息、成長、品質、報酬、ETF；點欄位標題排序，點股票看完整數據與 Yahoo Finance、SEC 年報、Finviz、TradingView 連結
 - 星號加入追蹤清單；目前結果可匯出 CSV（Excel 可直接開）；也可以匯入自己的 CSV（Finviz 匯出檔或含 Ticker／Symbol／代號欄的檔案）或 JSON
-- **資料更新**：`.github/workflows/update-stocks.yml` 在每個美股交易日收盤後（台灣時間早上 06:41）執行 `scripts/build_stocks.py`，用 yfinance 從 Yahoo Finance 抓基本面，並用含息調整後的股價計算報酬，寫入 `data/stocks.json`。某檔抓不到時保留前一天的數字；超過一半抓不到就不更新。要多追蹤其他股票（例如 TSM、ASML），把代號加到 `data/stocks-extra.txt`。第一次使用請到 GitHub → Actions →「Update US stock screener data」→ Run workflow 先產生資料
+- **資料更新**：`.github/workflows/update-stocks.yml` 在每個美股交易日收盤後（台灣時間早上 06:41）執行 `scripts/build_stocks.py`，用 yfinance 從 Yahoo Finance 抓基本面與選擇權隱含波動率，並用含息調整後的股價計算報酬，寫入 `data/stocks.json`。某檔抓不到時保留前一天的數字；超過一半抓不到就不更新。要多追蹤其他股票（例如 TSM、ASML），把代號加到 `data/stocks-extra.txt`。第一次使用請到 GitHub → Actions →「Update US stock screener data」→ Run workflow 先產生資料
+- **選擇權策略評估**（上方切到「選擇權策略」，或在股票詳細資料按「選擇權策略評估」；網址 `stocks.html#options=AAPL` 可直接開某檔）：
+  - 15 種策略一次比較：備兌買權、現金擔保賣權、保護性賣權、領口、買進買權／賣權、多頭買權價差、空頭賣權價差、多頭賣權價差與空頭買權價差（收權利金）、鐵兀鷹、蝶式、買進跨式、買進勒式、賣出勒式；可依看法（看漲、看跌、盤整、大波動）篩選
+  - 每種策略算出建立成本、最大獲利／虧損、損益兩平、獲利機率、期望值、年化期望報酬，以及 Delta、Gamma、Theta、Vega
+  - 履約價依波動自動挑選（約 ±0.5、±1 個標準差），權利金以 Black-Scholes 算理論價；每一腳的類型、買賣、口數、履約價、權利金都能改，可以填券商報價或自己組合策略
+  - 損益圖顯示到期與今天的損益、±1 標準差區間，滑鼠移上去看任一股價的損益
+  - 「你預期的波動」預設為過去一年實際波動，和隱含波動率（IV）比較：IV 偏高時賣方策略期望值較好，偏低時買方較好；篩選頁另有「選擇權：賣方」「選擇權：買方」兩個策略，依 IV／實際波動比排序
+  - IV 取自 Yahoo 最近 30 天左右到期的價平選擇權（`iv`、`ivDte`）；沒有資料時用實際波動代替
+  - 理論價是歐式模型，美股個股選擇權是美式，實際報價會不同；賣出選擇權的損失可能遠大於收到的權利金
 - 本工具僅供研究與學習，不構成投資建議；Yahoo Finance 資料可能延遲或有誤，使用前也請自行確認 Yahoo 的使用條款
 
 ## 出貨應收彙整（`shipping.html`）

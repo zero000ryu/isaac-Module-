@@ -8,6 +8,7 @@ Universe
 
 Data (Yahoo Finance through the yfinance package: pip install yfinance)
   - Ticker.info: name, sector, valuation (P/E, P/B, P/S, PEG), dividends, growth, margins, ROE, debt, ETF expense ratio
+  - Ticker.option_chain: at-the-money implied volatility of the expiry nearest 30 days out (iv, ivDte)
   - yf.download (dividend-adjusted closes, 5 years): 1-month, YTD, 1-year, 3-year and 5-year returns,
     distance from the 52-week high, volatility and max drawdown, computed here the same way for stocks and ETFs
 
@@ -152,6 +153,40 @@ def fetch_info(t):
     raise RuntimeError(str(last))
 
 
+def fetch_iv(t, price):
+    """At-the-money implied volatility (%) and days to expiry of the listed expiry nearest 30 days out."""
+    import yfinance as yf
+    if not price:
+        return None
+    try:
+        tk = yf.Ticker(yf_symbol(t))
+        today = dt.date.today()
+        exps = [(abs((dt.date.fromisoformat(e) - today).days - 30), e) for e in (tk.options or [])
+                if 14 <= (dt.date.fromisoformat(e) - today).days <= 75]
+        if not exps:
+            return None
+        exp = min(exps)[1]
+        ch = tk.option_chain(exp)
+        ivs = []
+        for side in (ch.calls, ch.puts):
+            side = side[(side['impliedVolatility'] > 0.01) & (side['impliedVolatility'] < 5)]
+            if len(side):
+                row = side.iloc[(side['strike'] - price).abs().argsort()[:1]]
+                ivs.append(float(row['impliedVolatility'].iloc[0]))
+        if not ivs:
+            return None
+        return {'iv': round(sum(ivs) / len(ivs) * 100, 1), 'ivDte': (dt.date.fromisoformat(exp) - today).days}
+    except Exception as e:  # options are a bonus: never fail the ticker over them
+        print(f'  {t} options: {e}', file=sys.stderr)
+        return None
+
+
+def fetch_all(t):
+    info = fetch_info(t)
+    price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('navPrice')
+    return info, fetch_iv(t, price)
+
+
 def record(t, info, meta):
     etf = info.get('quoteType') == 'ETF' or t in ETFS
     price = num(info.get('currentPrice') or info.get('regularMarketPrice') or info.get('navPrice'))
@@ -253,6 +288,8 @@ def add_returns(items):
         it['vol'] = round(float(daily.std()) * math.sqrt(252) * 100, 1) if len(daily) > 20 else None
         peak = s.cummax()
         it['maxDD'] = round(float((s / peak - 1).min()) * 100, 1)
+        if it.get('iv') and it.get('vol'):
+            it['ivHv'] = round(it['iv'] / it['vol'], 2)  # >1: options priced richer than the stock has actually moved
 
 
 def main():
@@ -270,11 +307,12 @@ def main():
 
     items, failed = [], []
     with cf.ThreadPoolExecutor(a.workers) as ex:
-        futs = {ex.submit(fetch_info, t): t for t in tickers}
+        futs = {ex.submit(fetch_all, t): t for t in tickers}
         for n, f in enumerate(cf.as_completed(futs), 1):
             t = futs[f]
             try:
-                items.append(record(t, f.result(), uni[t]))
+                info, iv = f.result()
+                items.append({**record(t, info, uni[t]), **(iv or {})})
             except Exception as e:
                 failed.append(t)
                 if t in prev_by:  # keep yesterday's numbers rather than lose the row
