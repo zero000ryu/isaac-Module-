@@ -71,6 +71,21 @@
   - 理論價是歐式模型，美股個股選擇權是美式，實際報價會不同；賣出選擇權的損失可能遠大於收到的權利金
 - 本工具僅供研究與學習，不構成投資建議；Yahoo Finance 資料可能延遲或有誤，使用前也請自行確認 Yahoo 的使用條款
 
+## 美股篩選放到 Synology NAS
+用 NAS 的 Web Station 架美股篩選網頁，NAS 每天自動從 GitHub 下載最新的網頁和股價、新聞資料（`scripts/synology_sync.sh`，只用 DSM 內建的 sh 和 curl）。以下以 DSM 7 為例：
+1. **安裝 Web Station**：套件中心 → 安裝「Web Station」，安裝後會多一個共用資料夾 `web`。
+2. **放入同步腳本**：File Station → `web` 裡新增資料夾 `stocks`，把 [synology_sync.sh](https://raw.githubusercontent.com/zero000ryu/isaac-Module-/main/scripts/synology_sync.sh) 下載後上傳進去。
+3. **設定每日排程**：控制台 → 任務排程表 → 新增 → 排定的任務 → 使用者定義的指令碼
+   - 一般：任務名稱「美股資料同步」，使用者選 `root`
+   - 排程：每天，時間 07:30（GitHub 每個美股交易日台灣時間 06:41 更新資料）
+   - 任務設定 → 執行指令：`sh /volume1/web/stocks/synology_sync.sh`（NAS 的儲存空間不是 volume1 的話要改，並在指令前加 `DEST=/volumeX/web/stocks`）；可勾選「僅在指令碼異常終止時傳送執行細節」收到失敗通知
+4. **先執行一次**：在任務排程表選這個任務 → 執行。結果寫在 `web/stocks/sync.log`。
+5. **打開網頁**：家裡網路用 `http://NAS的IP/stocks/`。
+6. **在外面用手機看**（選用）：QuickConnect 只能連 DSM 本身，連不到 Web Station 的網頁。建議在套件中心安裝 **Tailscale**，手機也裝 Tailscale 後就能用 `http://NAS的Tailscale IP/stocks/` 連線，不用在路由器開連接埠。也可以用 DDNS + 控制台「登入入口 → 進階 → 反向代理伺服器」+ Let's Encrypt 憑證開 HTTPS，但網頁本身沒有登入，知道網址的人都能看到股票資料。
+- 持股紀錄和觀察清單存在「各自瀏覽器、各自網址」裡，換到 NAS 網址後是空的：先在原本的網址按「匯出紀錄」「匯出清單」，再到 NAS 網址匯入。這些個人資料不會存在 NAS 或 GitHub 上。
+- repo 如果改成私人，在 GitHub 建立只有 Contents 讀取權限的 fine-grained token，排程指令改成 `SYNC_GITHUB_TOKEN=你的token sh /volume1/web/stocks/synology_sync.sh`。
+- 下載失敗時保留前一天的檔案，網頁照常可用。
+
 ## 出貨應收彙整（`shipping.html`）
 上傳 Word（.docx）、Excel（.xlsx、.xls）、CSV 出貨單，依客戶與帳款月份整理成應收帳款 Excel。檔案只在瀏覽器裡處理，不會上傳。
 - 自動讀出客戶、出貨日期、單號和品項（品名、規格、數量、單位、單價、金額），一個檔案裡有多張出貨單也可以；讀不到或合計對不起來的會標「需確認」，可以直接在表格修改
