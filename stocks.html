@@ -194,6 +194,37 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
   .tiles,.greeks{grid-template-columns:repeat(2,minmax(0,1fr))}
   .chartbox svg{height:240px}
 }
+
+.risk{display:inline-flex;gap:6px;align-items:center;justify-content:flex-end}
+.lvl{font-family:var(--f-body);font-size:11px;border:1px solid currentColor;border-radius:999px;padding:0 7px;white-space:nowrap}
+.lvl.l{color:var(--up)} .lvl.m{color:var(--warn)} .lvl.h{color:var(--down)}
+#tbl tr.hit td{background:var(--warn-soft)}
+.watchbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.watchbar input{flex:1 1 260px;text-transform:uppercase}
+.watchbar input::placeholder{text-transform:none}
+.sec{font-size:13px;color:var(--muted);font-weight:500;margin:0 0 4px;letter-spacing:.04em}
+.news{list-style:none;margin:0;padding:0}
+.news li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:start}
+.news li:last-child{border-bottom:none}
+.news li.msg{display:block;color:var(--muted);font-size:13px}
+.news a{color:inherit;text-decoration:none;font-weight:500}
+.news a:hover{text-decoration:underline}
+.news .meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sent{font-size:11px;border:1px solid currentColor;border-radius:999px;padding:0 6px;text-align:center;white-space:nowrap;margin-top:2px}
+.sent.n{color:var(--down)} .sent.p{color:var(--up)} .sent.z{color:var(--muted)}
+.cat{font-size:11px;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.symchip{font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--ink);border:0;background:var(--accent-soft);border-radius:4px;padding:0 5px;cursor:pointer}
+.riskbox{display:flex;gap:16px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.riskbox .big{font-family:var(--f-mono);font-size:30px;line-height:1.1;text-align:center;min-width:56px}
+.riskbox .big .lvl{display:inline-block;margin-top:4px;font-size:12px}
+.why{margin:4px 0 0;padding-left:18px;font-size:13px}
+.why li{margin:2px 0}
+.wfields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:8px}
+textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 10px;width:100%;font:inherit;color:inherit;resize:vertical}
+.fld input:disabled{opacity:.75}
+#colSeg{max-width:100%;overflow-x:auto;scrollbar-width:thin}
+#colSeg button{white-space:nowrap;flex:none}
+#dlgBody textarea{margin-bottom:6px}
 @media (max-width:720px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stat .v{font-size:18px}
@@ -241,12 +272,26 @@ dialog::backdrop{background:rgba(10,20,18,.45)}
   <div class="rules" id="rules"></div>
   <p class="hint" id="hint"></p>
 </section>
+<section class="panel" id="watchPanel" hidden aria-label="觀察清單">
+  <form class="watchbar" id="wForm" autocomplete="off">
+    <input id="wAdd" list="symList" placeholder="輸入代號加入觀察，例如 TSLA PLTR（可一次輸入多個）" spellcheck="false" aria-label="要加入觀察的代號">
+    <button class="btn primary" type="submit">＋ 加入觀察</button>
+    <button class="btn" type="button" id="wExport" title="下載觀察清單（含目標價與備註），可在其他裝置匯入">匯出清單</button>
+    <button class="btn" type="button" id="wImport">匯入清單</button>
+    <input type="file" id="wFile" accept=".json,application/json" hidden>
+  </form>
+  <p class="hint" id="wPending" hidden></p>
+</section>
 
 <div class="viewbar">
   <span class="count" id="count"></span>
   <div class="seg" id="colSeg" role="group" aria-label="欄位組合"></div>
 </div>
 <div class="table-wrap"><table id="tbl"><thead></thead><tbody></tbody></table><div class="more" id="more" hidden><button class="btn sm" id="btnMore">顯示更多</button></div></div>
+<section class="panel" id="watchNews" hidden aria-label="觀察清單近期新聞" style="margin-top:10px">
+  <h3 class="sec">觀察清單近期新聞</h3>
+  <ul class="news" id="wNews"></ul>
+</section>
 </div>
 <section id="optView" hidden aria-label="選擇權策略評估">
 <section class="panel">
@@ -318,6 +363,9 @@ const M = {
   upside:{l:'目標價空間',u:'%',d:1,dir:1,h:'分析師平均目標價相對現價'}, rating:{l:'分析師評等',d:1,dir:-1,h:'1 強力買進 … 5 賣出'},
   expense:{l:'內扣費用',u:'%',d:2,dir:-1,h:'ETF 每年的總費用率'},
   iv:{l:'隱含波動率',u:'%',d:1,h:'最近月份價平選擇權的 IV'}, ivHv:{l:'IV／實際波動',d:2,h:'>1 代表選擇權比股票過去一年的實際波動更貴，對賣方有利'},
+  risk:{l:'風險分',d:0,dir:-1,h:'0–100，越高風險越大：波動、Beta、回檔、負債、虧損與近期負面新聞'},
+  newsSent:{l:'新聞情緒',d:2,dir:1,h:'近 14 天新聞標題：-1 全負面 … +1 全正面'}, newsNeg:{l:'負面新聞',d:0,dir:-1,h:'近 14 天負面標題數'},
+  wChg:{l:'加入後漲跌',u:'%',d:1,dir:1,h:'加入觀察時的價格到現在'}, wTarget:{l:'目標買價',u:'$',d:2}, wGap:{l:'距目標價',u:'%',d:1,h:'現價比目標買價高多少；≤0 代表已到價'},
   sValue:{l:'價值分',d:0,dir:1}, sDiv:{l:'股息分',d:0,dir:1}, sGrowth:{l:'成長分',d:0,dir:1}, sQuality:{l:'品質分',d:0,dir:1},
 };
 const SCORES = {
@@ -335,6 +383,8 @@ const COLSETS = {
   '報酬':['price','r1m','rYtd','r1y','r3y','r5y','fromHigh','maxDD'],
   'ETF':['price','sector','mcap','expense','divYield','r1y','r3y','r5y'],
   '選擇權':['price','iv','vol','ivHv','divYield','beta','fromHigh','r1m'],
+  '風險':['price','risk','vol','beta','maxDD','de','newsNeg','newsSent'],
+  '觀察':['price','wTarget','wGap','wChg','risk','newsSent','r1m','fromHigh'],
 };
 const PRESETS = [
   {id:'all',name:'全部',sub:'不設條件',type:'all',rules:[],sort:['mcap',-1],cols:'概覽'},
@@ -347,7 +397,8 @@ const PRESETS = [
   {id:'etfDiv',name:'ETF：高股息',sub:'殖利率 ≥3%',type:'etf',rules:[['divYield',3,null]],sort:['divYield',-1],cols:'ETF'},
   {id:'optSell',name:'選擇權：賣方',sub:'IV 高於實際波動',type:'all',rules:[['ivHv',1.2,null],['mcap',10,null]],sort:['ivHv',-1],cols:'選擇權'},
   {id:'optBuy',name:'選擇權：買方',sub:'IV 低於實際波動',type:'all',rules:[['ivHv',null,0.85],['mcap',10,null]],sort:['ivHv',1],cols:'選擇權'},
-  {id:'watch',name:'★ 我的追蹤',sub:'加星號的股票',type:'all',rules:[],sort:['mcap',-1],cols:'概覽',watch:true},
+  {id:'lowRisk',name:'低風險',sub:'風險分 ≤30、無負面新聞',type:'stock',rules:[['risk',null,30],['newsNeg',null,0],['mcap',10,null]],sort:['risk',1],cols:'風險'},
+  {id:'watch',name:'★ 我的觀察',sub:'自選股、目標價、新聞',type:'all',rules:[],sort:['wGap',1],cols:'觀察',watch:true},
 ];
 
 // ---------- state ----------
@@ -355,8 +406,19 @@ const $ = s => document.querySelector(s);
 const store = {get(k,d){try{const v=localStorage.getItem('stocks.'+k);return v==null?d:JSON.parse(v)}catch{return d}},
                set(k,v){try{localStorage.setItem('stocks.'+k,JSON.stringify(v))}catch{}}};
 let DATA = [], META = {};
-const S = {preset:'value', type:'stock', q:'', sector:'', index:'', rules:[], sort:['sValue',-1], cols:'估值', limit:200,
-           watch:new Set(store.get('watch',[]))};
+const S = {preset:'value', type:'stock', q:'', sector:'', index:'', rules:[], sort:['sValue',-1], cols:'估值', limit:200};
+// watchlist: symbol -> {added, price at the time, target buy price, note}; old star lists are migrated
+const W = (() => { let w = store.get('watchlist', null);
+  if (!w || typeof w !== 'object'){ w = {}; for (const s of store.get('watch', [])) w[s] = {added:null, price:null, target:null, note:''} }
+  return w })();
+const isW = s => Object.prototype.hasOwnProperty.call(W, s);
+const saveW = () => store.set('watchlist', W);
+const today = () => new Date().toISOString().slice(0, 10);
+const NEWS_CAT = {legal:'法律／監管', rating:'評等下調', earnings:'財報／財測不佳', finance:'財務／債務', ops:'營運事件', mgmt:'管理層／會計', market:'股價重挫'};
+const RISK_DAYS = 14;
+let NEWS = null, newsP = null;
+const loadNews = () => newsP ||= fetch('data/news.json', {cache:'no-cache'}).then(r => r.ok ? r.json() : {}).then(j => NEWS = j.news || {}).catch(() => NEWS = {});
+const lvl = v => v < 35 ? ['l','低'] : v < 60 ? ['m','中'] : ['h','高'];
 
 // ---------- formatting ----------
 const isNum = v => typeof v === 'number' && isFinite(v);
@@ -364,10 +426,11 @@ function fmt(k, v){
   if (k === 'sector') return v ? esc(v) : '<span class="na">—</span>';
   if (!isNum(v)) return '<span class="na">—</span>';
   const m = M[k] || {d:2};
+  if (k === 'risk'){ const [c, t] = lvl(v); return `<span class="risk">${v.toFixed(0)}<span class="lvl ${c}">${t}</span></span>` }
   if (k.startsWith('s')) return `<span class="score">${v.toFixed(0)}<span class="bar"><i style="width:${v}%"></i></span></span>`;
   let s = v.toLocaleString('en-US',{minimumFractionDigits:m.d,maximumFractionDigits:m.d});
   if (m.u === '%') s += '%'; else if (m.u === '$') s = '$' + s; else if (m.u === 'B') s = v >= 1000 ? (v/1000).toFixed(2) + 'T' : s + 'B';
-  const signed = ['r1m','rYtd','r1y','r3y','r5y','revGrowth','epsGrowth','upside','fromHigh','maxDD'].includes(k);
+  const signed = ['r1m','rYtd','r1y','r3y','r5y','revGrowth','epsGrowth','upside','fromHigh','maxDD','newsSent','wChg'].includes(k);
   return signed ? `<span class="${v>0?'up':v<0?'down':''}">${v>0?'+':''}${s}</span>` : s;
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -403,13 +466,99 @@ function computeScores(items){
         it[s] = w >= need ? Math.round(sum / w) : null;
       }
     }
+    computeRisk(g, group === 'stock' ? '個股' : 'ETF');
   }
+}
+// [field, weight, +1 when a higher value is riskier]
+const RISK = [['vol',1.5,1],['beta',1,1],['maxDD',1,-1],['de',1,1],['currentRatio',.5,-1],['fromHigh',.5,-1],['newsRisk',1.5,1]];
+function computeRisk(g, groupName){
+  const sorted = {};
+  for (const [k] of RISK) sorted[k] = g.map(it => it[k]).filter(isNum).sort((a,b) => a-b);
+  const pct = (k, v) => { const a = sorted[k]; let lo = 0, hi = a.length; while (lo < hi){const m=(lo+hi)>>1; if (a[m] < v) lo = m+1; else hi = m} return a.length > 1 ? lo/(a.length-1)*100 : 50 };
+  const total = RISK.reduce((a, [, w]) => a + w, 0);
+  for (const it of g){
+    let sum = 0, w = 0; const why = [];
+    for (const [k, wt, dir] of RISK){
+      const v = it[k]; if (!isNum(v)) continue;
+      let p = k === 'de' && v < 0 ? 100 : pct(k, v); if (dir < 0 && !(k === 'de')) p = 100 - p;
+      sum += p*wt; w += wt;
+      if (p >= 80 && k !== 'newsRisk'){
+        const top = Math.round(p);
+        why.push({vol:`年化波動 ${v}%，高於 ${top}% 的${groupName}`, beta:`Beta ${v}，漲跌比大盤劇烈（高於 ${top}% 的${groupName}）`,
+          maxDD:`5 年最大回檔 ${v}%`, de: v < 0 ? '股東權益為負' : `負債權益比 ${v}，負債偏高`, currentRatio:`流動比率 ${v}，短期償債能力偏弱`,
+          fromHigh:`距 52 週高點 ${v}%，正處於明顯下跌`}[k]);
+      }
+    }
+    if (w < total/2){ it.risk = null; it.riskWhy = []; continue }
+    let bonus = 0;
+    if (isNum(it.margin) && it.margin < 0){ bonus += 10; why.push(`公司目前虧損（淨利率 ${it.margin}%）`) }
+    if (isNum(it.payout) && it.payout > 100){ bonus += 5; why.push(`配息率 ${it.payout}%，發的股息超過盈餘`) }
+    const flags = it.newsFlags || [];
+    const serious = flags.filter(f => ['legal','finance','mgmt'].includes(f));
+    bonus += Math.min(10, serious.length*5);
+    if (it.newsNeg > 0) why.push(`近 ${RISK_DAYS} 天 ${it.newsNeg}/${it.newsN} 則負面新聞` + (flags.length ? `：${flags.map(f => NEWS_CAT[f] || f).join('、')}` : ''));
+    it.risk = Math.min(100, Math.round(sum/w + bonus));
+    it.riskWhy = why;
+  }
+}
+
+// ---------- watchlist ----------
+function syncWatch(){
+  DATA = DATA.filter(it => !it.placeholder || isW(it.symbol));
+  const have = new Set(DATA.map(it => it.symbol));
+  for (const s of Object.keys(W)) if (!have.has(s))
+    DATA.push({symbol:s, name:'不在每日資料裡：加到 data/stocks-extra.txt，下次更新後才有數字', type:'stock', indexes:[], placeholder:true});
+  let changed = false;
+  for (const it of DATA){
+    const w = W[it.symbol];
+    if (!w){ delete it.wChg; delete it.wTarget; delete it.wGap; continue }
+    if (w.price == null && isNum(it.price)){ w.price = it.price; w.added ||= today(); changed = true } // first time we see a price
+    it.wChg = w.price && isNum(it.price) ? Math.round((it.price/w.price - 1)*1000)/10 : null;
+    it.wTarget = isNum(w.target) && w.target > 0 ? w.target : null;
+    it.wGap = it.wTarget && isNum(it.price) ? Math.round((it.price/it.wTarget - 1)*1000)/10 : null;
+  }
+  if (changed) saveW();
+}
+function addWatch(text){
+  const syms = [...new Set(String(text).toUpperCase().split(/[\s,，、;]+/).filter(Boolean))];
+  const bad = syms.filter(s => !/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)), added = [];
+  for (const s of syms) if (!bad.includes(s) && !isW(s)){
+    const it = DATA.find(x => x.symbol === s && !x.placeholder);
+    W[s] = {added:today(), price: it && isNum(it.price) ? it.price : null, target:null, note:''}; added.push(s);
+  }
+  saveW(); syncWatch();
+  if (bad.length) toast((added.length ? `已加入 ${added.join('、')}；` : '') + `代號格式不對：${bad.join('、')}`);
+  else if (added.length) toast(`已加入觀察：${added.join('、')}`);
+  else if (syms.length) toast('這些代號已經在觀察清單裡');
+  return added;
+}
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : null;
+function ago(iso){
+  const d = new Date(iso), h = (Date.now() - d)/36e5;
+  return isNaN(h) ? '' : h < 1 ? '剛剛' : h < 24 ? `${Math.floor(h)} 小時前` : h < 24*7 ? `${Math.floor(h/24)} 天前` : d.toLocaleDateString('zh-TW');
+}
+function newsLi(n, sym){
+  const [c, t] = n.s < 0 ? ['n','負面'] : n.s > 0 ? ['p','正面'] : ['z','中性'];
+  const u = safeUrl(n.u), title = u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n.t)}</a>` : esc(n.t);
+  return `<li><span class="sent ${c}">${t}</span><div>${title}<div class="meta">${sym ? `<button class="symchip" data-open="${esc(sym)}">${esc(sym)}</button>` : ''}<span>${esc(n.p)}${n.p ? ' · ' : ''}${ago(n.d)}</span>${(n.c||[]).map(k => `<span class="cat">${esc(NEWS_CAT[k] || k)}</span>`).join('')}</div></div></li>`;
+}
+function renderWatchPanel(){
+  const pending = Object.keys(W).filter(s => DATA.find(it => it.symbol === s)?.placeholder);
+  const pe = $('#wPending'); pe.hidden = !pending.length;
+  if (pending.length) pe.innerHTML = `<b>${pending.map(esc).join('、')}</b> 不在每日資料裡，所以還沒有數字和新聞。到 GitHub 把代號加進 <a href="https://github.com/zero000ryu/isaac-Module-/edit/main/data/stocks-extra.txt" target="_blank" rel="noopener">data/stocks-extra.txt</a>（一行一個），下次自動更新後就會出現。 <button class="btn sm" type="button" id="wCopy">複製代號</button>`;
+  const ul = $('#wNews'), syms = Object.keys(W);
+  if (!syms.length){ ul.innerHTML = '<li class="msg">觀察清單是空的。在上面輸入代號，或在表格裡點 ☆ 加入。</li>'; return }
+  if (!NEWS){ ul.innerHTML = '<li class="msg">新聞載入中…</li>'; loadNews().then(() => { if (!$('#watchNews').hidden) renderWatchPanel() }); return }
+  const all = syms.flatMap(s => (NEWS[s] || []).map(n => ({...n, sym:s}))).sort((a, b) => b.d.localeCompare(a.d)).slice(0, 25);
+  ul.innerHTML = all.length ? all.map(n => newsLi(n, n.sym)).join('')
+    : '<li class="msg">觀察中的股票最近 30 天沒有抓到新聞（資料每個交易日更新）。</li>';
 }
 
 // ---------- filtering ----------
 function passes(it){
   if (S.type !== 'all' && it.type !== S.type) return false;
-  if (PRESETS.find(p => p.id === S.preset)?.watch && !S.watch.has(it.symbol)) return false;
+  const wv = PRESETS.find(p => p.id === S.preset)?.watch;
+  if (wv ? !isW(it.symbol) : it.placeholder) return false;
   if (S.sector && it.sector !== S.sector) return false;
   if (S.index && !(it.indexes || []).includes(S.index)) return false;
   if (S.q){
@@ -458,7 +607,9 @@ function renderControls(){
     + `<select class="addrule" id="addRule" aria-label="新增條件"><option value="">＋ 新增條件…</option>${opts}</select>`
     + (S.rules.length ? `<button class="btn sm ghost" id="clearRules">清除條件</button>` : '');
   const h = PRESETS.find(p => p.id === S.preset);
-  $('#hint').textContent = h?.watch ? '在表格左邊點 ☆ 把股票加入追蹤；追蹤清單只存在這台裝置的瀏覽器。'
+  $('#watchPanel').hidden = $('#watchNews').hidden = !h?.watch;
+  if (h?.watch) renderWatchPanel();
+  $('#hint').textContent = h?.watch ? '點股票可設定目標買價和備註，到價的列會標底色。清單只存在這台裝置的瀏覽器，換裝置前請先「匯出清單」。'
     : '條件留空代表不限；沒有該項資料的股票會被排除。滑鼠移到條件上可看說明。';
 }
 function renderStats(rows){
@@ -466,6 +617,13 @@ function renderStats(rows){
   const etfMode = S.type === 'etf' || (rows.length > 0 && !stocks.length);
   const base = etfMode ? rows : stocks;
   const v = (x, k) => x == null ? '—' : fmt(k, x).replace(/<[^>]+>/g, '');
+  const tiles = PRESETS.find(p => p.id === S.preset)?.watch ? [
+    ['觀察中', rows.length.toLocaleString()],
+    ['已到目標買價', rows.filter(r => isNum(r.wGap) && r.wGap <= 0).length],
+    ['高風險（≥60）', rows.filter(r => isNum(r.risk) && r.risk >= 60).length],
+    [`近 ${RISK_DAYS} 天有負面新聞`, rows.filter(r => r.newsNeg > 0).length],
+  ] : null;
+  if (tiles){ $('#stats').innerHTML = tiles.map(([k, val]) => `<div class="stat"><div class="k">${k}</div><div class="v">${val}</div></div>`).join(''); return }
   $('#stats').innerHTML = [
     ['符合條件', rows.length.toLocaleString() + (DATA.length ? ` / ${DATA.length}` : '')],
     [etfMode ? '內扣費用中位數' : '本益比中位數', etfMode ? v(median(rows.map(r => r.expense)), 'expense') : v(median(base.map(r => r.pe > 0 ? r.pe : null)), 'pe')],
@@ -488,12 +646,14 @@ function render(){
     $('#more').hidden = true; $('#count').textContent = ''; return;
   }
   if (!rows.length){
-    body.innerHTML = `<tr><td colspan="${cols.length+2}" class="empty"><h2>沒有符合條件的股票</h2>放寬或移除一些條件試試看。</td></tr>`;
+    body.innerHTML = PRESETS.find(p => p.id === S.preset)?.watch && !Object.keys(W).length
+      ? `<tr><td colspan="${cols.length+2}" class="empty"><h2>觀察清單是空的</h2>在上方輸入代號，或在其他篩選結果裡點 ☆ 加入。</td></tr>`
+      : `<tr><td colspan="${cols.length+2}" class="empty"><h2>沒有符合條件的股票</h2>放寬或移除一些條件試試看。</td></tr>`;
     $('#more').hidden = true; $('#count').textContent = '0 檔'; return;
   }
   const shown = rows.slice(0, S.limit);
-  body.innerHTML = shown.map(r => `<tr data-s="${esc(r.symbol)}">
-    <td class="star"><button class="starbtn" data-star="${esc(r.symbol)}" aria-pressed="${S.watch.has(r.symbol)}" aria-label="追蹤 ${esc(r.symbol)}">${S.watch.has(r.symbol)?'★':'☆'}</button></td>
+  body.innerHTML = shown.map(r => `<tr data-s="${esc(r.symbol)}" class="${isW(r.symbol) && isNum(r.wGap) && r.wGap <= 0 ? 'hit' : ''}">
+    <td class="star"><button class="starbtn" data-star="${esc(r.symbol)}" aria-pressed="${isW(r.symbol)}" aria-label="觀察 ${esc(r.symbol)}">${isW(r.symbol)?'★':'☆'}</button></td>
     <td class="sym"><b>${esc(r.symbol)}</b>${r.type==='etf'?'<span class="tag">ETF</span>':''}<span class="nm">${esc(r.name)}${r.sector && r.type!=='etf' ? ' · ' + esc(r.sector) : ''}</span></td>
     ${cols.map(k => `<td>${fmt(k, r[k])}</td>`).join('')}</tr>`).join('');
   $('#more').hidden = rows.length <= S.limit;
@@ -512,8 +672,9 @@ function applyPreset(id){
 function openDetail(sym){
   const r = DATA.find(x => x.symbol === sym); if (!r) return;
   $('#dlgTitle').innerHTML = `${esc(r.symbol)} ${r.type==='etf'?'<span class="tag">ETF</span>':''}<small>${esc(r.name)}${r.sector?' · '+esc(r.sector):''}${r.industry?' · '+esc(r.industry):''}</small>`;
-  const on = S.watch.has(r.symbol);
-  $('#dlgActions').innerHTML = `<button class="btn sm" data-star="${esc(r.symbol)}" aria-pressed="${on}">${on?'★ 已追蹤':'☆ 追蹤'}</button><button class="btn sm" id="dlgClose" aria-label="關閉">✕</button>`;
+  const on = isW(r.symbol), w = W[r.symbol];
+  $('#dlg').dataset.sym = r.symbol;
+  $('#dlgActions').innerHTML = `<button class="btn sm" data-star="${esc(r.symbol)}" aria-pressed="${on}">${on?'★ 觀察中':'☆ 加入觀察'}</button><button class="btn sm" id="dlgClose" aria-label="關閉">✕</button>`;
   const grp = (title, keys) => {
     const cells = keys.filter(k => r[k] != null).map(k => `<div title="${esc(M[k].h||'')}"><dt>${esc(M[k].l)}</dt><dd>${fmt(k, r[k])}</dd></div>`).join('');
     return cells ? `<h3>${title}</h3><dl class="kv">${cells}</dl>` : '';
@@ -521,7 +682,19 @@ function openDetail(sym){
   const sc = r.type === 'stock' ? `<div class="scores4">${['sValue','sDiv','sGrowth','sQuality'].map(k => `<div><div class="k">${M[k].l}</div><div class="v">${isNum(r[k])?r[k]:'—'}</div></div>`).join('')}</div>
     <p class="note">分數 0–100：在全部個股中的百分位，越高越符合該風格。</p>` : '';
   const y = encodeURIComponent(r.symbol.replace('.', '-'));
-  $('#dlgBody').innerHTML = sc
+  const wbox = on ? `<h3>我的觀察</h3><div class="wfields">
+      <label class="fld"><span>目標買價 $</span><input id="wT" inputmode="decimal" value="${isNum(w.target) ? w.target : ''}" placeholder="到價時會標示"></label>
+      <label class="fld"><span>加入日期／當時價格</span><input disabled value="${esc(w.added || '—')} · ${isNum(w.price) ? '$' + w.price.toFixed(2) : '—'}"></label>
+      ${isNum(r.wChg) ? `<div class="fld"><span>加入後漲跌</span><div class="mono" style="padding-top:6px">${fmt('wChg', r.wChg)}</div></div>` : ''}</div>
+      <label class="fld"><span>備註（觀察理由、在等的事件）</span><textarea id="wNote" rows="2">${esc(w.note || '')}</textarea></label>` : '';
+  const why = r.riskWhy || [];
+  const rbox = isNum(r.risk) ? `<h3>風險評估</h3><div class="riskbox"><div class="big">${r.risk}<br><span class="lvl ${lvl(r.risk)[0]}">${lvl(r.risk)[1]}風險</span></div>
+      <div><div class="note">風險分 0–100：波動、Beta、最大回檔、負債、流動比率、距高點與近期負面新聞，在同類中的百分位加權，再加上虧損、配息過高與法律／財務類新聞的加分。</div>
+      <ul class="why">${why.length ? why.map(x => `<li>${esc(x)}</li>`).join('') : '<li>沒有特別突出的風險項目</li>'}</ul></div></div>` : '';
+  const nsum = isNum(r.newsN) ? `<p class="note">近 ${RISK_DAYS} 天 ${r.newsN} 則：負面 ${r.newsNeg}、正面 ${r.newsPos ?? 0}${isNum(r.newsSent) ? `，情緒 ${fmt('newsSent', r.newsSent)}` : ''}。正負面是依標題關鍵字判斷，請點開原文確認。</p>` : '';
+  $('#dlgBody').innerHTML = (r.placeholder ? `<p class="note">${esc(r.name)}</p>` : '') + wbox + sc + rbox
+    + `<h3>近期新聞</h3>${nsum}<ul class="news" id="dlgNews"><li class="msg">載入中…</li></ul>`
+    + ''
     + grp('價格與規模', ['price','mcap','beta','fromHigh','upside','rating','expense'])
     + grp('估值', ['pe','fpe','peg','pb','ps','evEbitda','fcfYield'])
     + grp('股息', ['divYield','div5y','payout'])
@@ -535,6 +708,11 @@ function openDetail(sym){
         <a class="btn sm" href="https://www.tradingview.com/symbols/${y}/" target="_blank" rel="noopener">TradingView</a></div>
       <p class="note">資料日期：${esc(r.asOf || '—')}${(r.indexes||[]).length ? ' · 成分：' + r.indexes.map(esc).join('、') : ''}</p>`;
   const d = $('#dlg'); if (!d.open) d.showModal();
+  loadNews().then(() => {
+    if ($('#dlg').dataset.sym !== r.symbol) return;
+    const list = NEWS[r.symbol] || [];
+    const ul = $('#dlgNews'); if (ul) ul.innerHTML = list.length ? list.map(n => newsLi(n)).join('') : '<li class="msg">最近 30 天沒有抓到這檔的新聞。</li>';
+  });
 }
 
 // ---------- import / export ----------
@@ -587,7 +765,7 @@ function importRows(text){
 }
 function loadItems(items, meta, label){
   DATA = items; META = meta || {};
-  computeScores(DATA);
+  computeScores(DATA); syncWatch();
   const when = META.generatedAt ? new Date(META.generatedAt) : null;
   $('#symList').innerHTML = DATA.map(it => `<option value="${esc(it.symbol)}">${esc(it.name)}</option>`).join('');
   $('#asof').textContent = label || (when ? `資料更新：${when.toLocaleString('zh-TW',{dateStyle:'medium',timeStyle:'short'})}` : '');
@@ -621,10 +799,43 @@ $('#btnExport').onclick = () => {
 
 // ---------- events ----------
 function toggleStar(sym){
-  S.watch.has(sym) ? S.watch.delete(sym) : S.watch.add(sym);
-  store.set('watch', [...S.watch]); render();
-  if ($('#dlg').open) openDetail(sym);
+  if (isW(sym)){ delete W[sym]; saveW(); syncWatch() } else addWatch(sym);
+  renderControls(); render();
+  if ($('#dlg').open){ if (DATA.some(x => x.symbol === sym)) openDetail(sym); else $('#dlg').close() }
 }
+$('#wForm').addEventListener('submit', e => { e.preventDefault(); const i = $('#wAdd');
+  if (addWatch(i.value).length) i.value = ''; renderControls(); render() });
+$('#wExport').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({exported:new Date().toISOString(), watchlist:W}, null, 1)], {type:'application/json'}));
+  a.download = `觀察清單-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#wImport').onclick = () => $('#wFile').click();
+$('#wFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()), src = j.watchlist || j;
+    const list = Array.isArray(src) ? Object.fromEntries(src.map(s => [s, {}])) : src;
+    let n = 0;
+    for (const [s, v] of Object.entries(list)){
+      const k = String(s).toUpperCase(); if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(k)) continue;
+      W[k] = {added: v.added || W[k]?.added || today(), price: isNum(v.price) ? v.price : W[k]?.price ?? null,
+              target: isNum(v.target) ? v.target : W[k]?.target ?? null, note: typeof v.note === 'string' ? v.note : W[k]?.note || ''};
+      n++;
+    }
+    saveW(); syncWatch(); renderControls(); render(); toast(`已匯入 ${n} 檔觀察股票`);
+  } catch (err) { toast('匯入失敗：' + err.message) }
+};
+$('#wPending').addEventListener('click', e => { if (e.target.id !== 'wCopy') return;
+  const t = Object.keys(W).filter(s => DATA.find(it => it.symbol === s)?.placeholder).join('\n');
+  navigator.clipboard?.writeText(t).then(() => toast('已複製，貼到 stocks-extra.txt'), () => toast(t)) });
+$('#watchNews').addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (b) openDetail(b.dataset.open) });
+$('#dlg').addEventListener('input', e => {
+  const sym = $('#dlg').dataset.sym; if (!isW(sym)) return;
+  if (e.target.id === 'wT'){ const v = e.target.value.trim(), n = Number(v); if (v && (!isFinite(n) || n <= 0)) return;
+    W[sym].target = v ? n : null; saveW(); syncWatch(); renderStats(filtered()); render() }
+  if (e.target.id === 'wNote'){ W[sym].note = e.target.value; saveW() }
+});
 $('#presets').onclick = e => { const b = e.target.closest('.preset'); if (b) applyPreset(b.dataset.id) };
 $('#typeSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.type = b.dataset.v;
   if (S.type === 'etf' && !['ETF','報酬','概覽','選擇權'].includes(S.cols)) S.cols = 'ETF';
@@ -967,7 +1178,7 @@ let oRT; window.addEventListener('resize', () => { clearTimeout(oRT); oRT = setT
   renderPresets(); update();
   fetch('data/stocks.json', {cache:'no-cache'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json() })
     .then(d => loadItems(d.items || [], d.meta))
-    .catch(() => { $('#asof').textContent = '尚未載入資料'; render() })
+    .catch(() => { $('#asof').textContent = '尚未載入資料'; syncWatch(); renderControls(); render() })
     .finally(route);
 })();
 </script>

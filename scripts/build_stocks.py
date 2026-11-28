@@ -9,6 +9,8 @@ Universe
 Data (Yahoo Finance through the yfinance package: pip install yfinance)
   - Ticker.info: name, sector, valuation (P/E, P/B, P/S, PEG), dividends, growth, margins, ROE, debt, ETF expense ratio
   - Ticker.option_chain: at-the-money implied volatility of the expiry nearest 30 days out (iv, ivDte)
+  - Ticker.news (Google News RSS when Yahoo has none): recent headlines per ticker, tagged by keyword rules
+    as negative / positive and by risk category, written to data/news.json; counts go into stocks.json
   - yf.download (dividend-adjusted closes, 5 years): 1-month, YTD, 1-year, 3-year and 5-year returns,
     distance from the 52-week high, volatility and max drawdown, computed here the same way for stocks and ETFs
 
@@ -17,12 +19,34 @@ never empties the page.
 
 Usage: python scripts/build_stocks.py [--limit N] [--workers 4] [--only AAPL,MSFT]
 """
-import argparse, concurrent.futures as cf, datetime as dt, html, json, math, os, re, sys, time, urllib.request
+import argparse, concurrent.futures as cf, datetime as dt, email.utils, html, json, math, os, re, sys, time, urllib.parse, urllib.request
+import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 OUT = os.path.join(DATA, 'stocks.json')
 EXTRA = os.path.join(DATA, 'stocks-extra.txt')
+NEWS_OUT = os.path.join(DATA, 'news.json')
+NEWS_DAYS, NEWS_KEEP = 30, 8          # headlines kept per ticker for the page
+RISK_DAYS = 14                        # window that counts toward the risk score
+# Headline keyword rules (English headlines). Negative categories feed the risk score; the page shows their names.
+NEG = {k: re.compile(v, re.I) for k, v in {
+    'legal': r'\b(lawsuits?|sued|sues|class action|litigation|probe[sd]?|investigat\w*|subpoena\w*|indict\w*|fraud|antitrust|doj|ftc|'
+             r'sec (charges|probe|investigation)|penalt\w+|fined|fines? of|violation|regulator\w* (crack|scrutiny)|ban(s|ned)?)\b',
+    'rating': r'\b(downgrade[sd]?|cuts? to (sell|underperform|neutral|hold)|(lowers?|cuts?|slash\w*) (its |the )?price target|bearish call)\b',
+    'earnings': r'\b(miss(es|ed)? (estimates|expectations|forecasts?)|(lowers?|cuts?|slash\w*|withdraws?) (its |full-year |annual )?(guidance|outlook|forecast)|'
+                r'profit warning|weak (guidance|outlook|forecast)|revenue (decline|drop|falls?)|losses? widen\w*)\b',
+    'finance': r'\b(bankrupt\w*|chapter 11|default\w*|going concern|liquidity (crunch|concerns?)|dilut\w+|(stock|share) offering|'
+               r'credit rating (cut|downgrade)|junk status|dividend cut|cuts? (its )?dividend|suspends? (its )?dividend)\b',
+    'ops': r'\b(recalls?|outage|data breach|breach|hack(ed|ers?)?|cyberattack|(workers|union) strike|on strike|plant shutdown|'
+           r'production halt|supply (chain )?(disruption|shortage)|layoffs?|job cuts|cuts? \d[\d,]* jobs|restructuring)\b',
+    'mgmt': r'\b((ceo|cfo|chief executive|chief financial officer) (resigns?|steps? down|departs?|exits?|ousted|fired)|'
+            r'accounting (issues?|irregularit\w+|probe)|restate\w*|whistleblower)\b',
+    'market': r'\b(plunge[sd]?|plummet\w*|tumble[sd]?|sinks?|sank|slump\w*|crash\w*|sell-?off|short sellers?|short report|delist\w*|52-week low)\b',
+}.items()}
+POS = re.compile(r'\b(upgrade[sd]?|beats?|tops? (estimates|expectations)|raises? (its |full-year |annual )?(guidance|outlook|forecast|dividend)|'
+                 r'record (revenue|sales|profit|earnings|high)|buybacks?|repurchases?|approval|approved|surge[sd]?|soar\w*|jumps?|'
+                 r'rall(y|ies|ied)|outperform\w*|strong demand|wins? (a )?contract|dividend (hike|increase))\b', re.I)
 UA = 'Mozilla/5.0 (compatible; stock-screener-builder/1.0)'
 INDEX_PAGES = {
     'S&P 500': 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies',
@@ -181,10 +205,101 @@ def fetch_iv(t, price):
         return None
 
 
-def fetch_all(t):
+def tag_headline(title):
+    """(-1/0/+1, [negative categories]) from keyword rules."""
+    cats = [k for k, rx in NEG.items() if rx.search(title)]
+    pos = bool(POS.search(title))
+    s = -1 if cats and (not pos or len(cats) > 1) else 1 if pos and not cats else 0
+    return s, cats
+
+
+def _iso(ts):
+    if isinstance(ts, (int, float)):
+        return dt.datetime.fromtimestamp(ts, dt.timezone.utc)
+    if isinstance(ts, str) and ts:
+        try:
+            return dt.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        except ValueError:
+            try:
+                return email.utils.parsedate_to_datetime(ts)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def yahoo_news(t):
+    import yfinance as yf
+    out = []
+    for n in yf.Ticker(yf_symbol(t)).news or []:
+        c = n.get('content') or n  # yfinance >= 0.2.50 nests the story under "content"
+        url = ((c.get('canonicalUrl') or {}).get('url') or (c.get('clickThroughUrl') or {}).get('url')
+               or n.get('link'))
+        out.append({'title': c.get('title'), 'pub': (c.get('provider') or {}).get('displayName') or n.get('publisher'),
+                    'url': url, 'when': _iso(c.get('pubDate') or c.get('displayTime') or n.get('providerPublishTime'))})
+    return out
+
+
+def google_news(t):
+    q = urllib.parse.quote(f'{t} stock')
+    root = ET.fromstring(get(f'https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en', tries=2))
+    out = []
+    for it in root.iter('item'):
+        title, src = it.findtext('title') or '', it.find('source')
+        pub = src.text if src is not None else ''
+        if pub and title.endswith(' - ' + pub):
+            title = title[:-len(pub) - 3]
+        out.append({'title': title, 'pub': pub, 'url': it.findtext('link'), 'when': _iso(it.findtext('pubDate'))})
+    return out
+
+
+def fetch_news(t):
+    try:
+        raw = yahoo_news(t)
+    except Exception as e:
+        print(f'  {t} yahoo news: {e}', file=sys.stderr)
+        raw = []
+    if not raw:
+        try:
+            raw = google_news(t)
+        except Exception as e:
+            print(f'  {t} google news: {e}', file=sys.stderr)
+            return None
+    cut = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=NEWS_DAYS)
+    seen, out = set(), []
+    for n in sorted((n for n in raw if n['title'] and n['when'] and n['when'] >= cut), key=lambda n: n['when'], reverse=True):
+        key = re.sub(r'\W+', ' ', n['title'].lower()).strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        s, cats = tag_headline(n['title'])
+        out.append({'d': n['when'].isoformat(timespec='minutes'), 't': n['title'], 'p': n['pub'] or '', 'u': n['url'] or '',
+                    's': s, 'c': cats})
+    return out[:NEWS_KEEP]
+
+
+def news_summary(news):
+    """Recent-news fields for stocks.json; newer headlines weigh more."""
+    now = dt.datetime.now(dt.timezone.utc)
+    recent = []
+    for n in news or []:
+        age = (now - dt.datetime.fromisoformat(n['d'])).days
+        if age <= RISK_DAYS:
+            recent.append((1 if age <= 3 else .6 if age <= 7 else .3, n))
+    w = sum(x for x, _ in recent)
+    neg = [(x, n) for x, n in recent if n['s'] < 0]
+    return {
+        'newsN': len(recent), 'newsNeg': len(neg), 'newsPos': sum(n['s'] > 0 for _, n in recent),
+        'newsSent': round(sum(x * n['s'] for x, n in recent) / w, 2) if w else None,
+        'newsRisk': round(max(0, sum(x * (1 + .5 * (len(n['c']) - 1)) for x, n in neg)
+                              - .5 * sum(x for x, n in recent if n['s'] > 0)), 2),
+        'newsFlags': sorted({c for _, n in neg for c in n['c']}),
+    }
+
+
+def fetch_all(t, with_news=True):
     info = fetch_info(t)
     price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('navPrice')
-    return info, fetch_iv(t, price)
+    return info, fetch_iv(t, price), fetch_news(t) if with_news else None
 
 
 def record(t, info, meta):
@@ -297,6 +412,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0, help='only the first N tickers (testing)')
     ap.add_argument('--workers', type=int, default=4)
     ap.add_argument('--only', default='', help='comma separated tickers (testing)')
+    ap.add_argument('--no-news', action='store_true', help='skip headlines (keeps the previous data/news.json)')
     a = ap.parse_args()
 
     prev = load_previous()
@@ -305,18 +421,26 @@ def main():
     tickers = sorted(uni)[:a.limit] if a.limit else sorted(uni)
     print(f'{len(tickers)} tickers')
 
+    try:
+        prev_news = json.load(open(NEWS_OUT, encoding='utf-8')).get('news', {})
+    except (OSError, ValueError):
+        prev_news = {}
+    news = {}
     items, failed = [], []
     with cf.ThreadPoolExecutor(a.workers) as ex:
-        futs = {ex.submit(fetch_all, t): t for t in tickers}
+        futs = {ex.submit(fetch_all, t, not a.no_news): t for t in tickers}
         for n, f in enumerate(cf.as_completed(futs), 1):
             t = futs[f]
             try:
-                info, iv = f.result()
-                items.append({**record(t, info, uni[t]), **(iv or {})})
+                info, iv, nw = f.result()
+                news[t] = nw if nw is not None else prev_news.get(t, [])  # a failed news fetch keeps yesterday's
+                items.append({**record(t, info, uni[t]), **(iv or {}), **news_summary(news[t])})
             except Exception as e:
                 failed.append(t)
                 if t in prev_by:  # keep yesterday's numbers rather than lose the row
                     items.append({**prev_by[t], 'indexes': uni[t]['indexes']})
+                if t in prev_news:
+                    news[t] = prev_news[t]
                 print(f'  {t}: {e}', file=sys.stderr)
             if n % 50 == 0:
                 print(f'  {n}/{len(tickers)}')
@@ -340,6 +464,10 @@ def main():
     with open(OUT + '.tmp', 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
     os.replace(OUT + '.tmp', OUT)
+    with open(NEWS_OUT + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump({'meta': {'generatedAt': out['meta']['generatedAt'], 'days': NEWS_DAYS},
+                   'news': {t: n for t, n in sorted(news.items()) if n}}, f, ensure_ascii=False, separators=(',', ':'))
+    os.replace(NEWS_OUT + '.tmp', NEWS_OUT)
     print(f'wrote {OUT}: {out["meta"]["stocks"]} stocks, {out["meta"]["etfs"]} ETFs, {len(failed)} failed')
 
 
