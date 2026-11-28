@@ -4,10 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # the data job pushes with GITHUB_TOKEN, which does not fire "push": redeploy when it finishes instead
-  workflow_run:
-    workflows: ["Update US stock screener data"]
-    types: [completed]
 
 permissions:
   contents: read
@@ -40,12 +36,16 @@ jobs:
           HTML
           done
           touch _site/.nojekyll
-      - name: US stock screener at /stocks/ (public market data only; holdings stay in each browser)
+      - name: Old stock screener address forwards to its own site
         run: |
-          mkdir -p _site/stocks/data
-          cp stocks.html _site/stocks/index.html
-          for f in stocks.json news.json; do if [ -f data/$f ]; then cp data/$f _site/stocks/data/; fi; done
-          ls -la _site/stocks _site/stocks/data
+          mkdir -p _site/stocks
+          cat > _site/stocks/index.html <<'HTML'
+          <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+          <meta name="robots" content="noindex,nofollow">
+          <meta http-equiv="refresh" content="0; url=https://zero000ryu.github.io/invest/">
+          <title>美股篩選已搬家</title></head>
+          <body><p>美股篩選已搬到 <a href="https://zero000ryu.github.io/invest/">https://zero000ryu.github.io/invest/</a></p></body></html>
+          HTML
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
