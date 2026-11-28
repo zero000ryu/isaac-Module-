@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # the data job pushes with GITHUB_TOKEN, which does not fire "push": redeploy when it finishes instead
+  workflow_run:
+    workflows: ["Update US stock screener data"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -21,6 +25,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Prepare site (redirect only; the database lives at dental.top-geng.com behind ERP login, hosted on Vercel)
         run: |
           mkdir -p _site
@@ -33,6 +40,12 @@ jobs:
           HTML
           done
           touch _site/.nojekyll
+      - name: US stock screener at /stocks/ (public market data only; holdings stay in each browser)
+        run: |
+          mkdir -p _site/stocks/data
+          cp stocks.html _site/stocks/index.html
+          for f in stocks.json news.json; do if [ -f data/$f ]; then cp data/$f _site/stocks/data/; fi; done
+          ls -la _site/stocks _site/stocks/data
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
