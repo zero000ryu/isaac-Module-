@@ -48,10 +48,12 @@ POS = re.compile(r'\b(upgrade[sd]?|beats?|tops? (estimates|expectations)|raises?
                  r'record (revenue|sales|profit|earnings|high)|buybacks?|repurchases?|approval|approved|surge[sd]?|soar\w*|jumps?|'
                  r'rall(y|ies|ied)|outperform\w*|strong demand|wins? (a )?contract|dividend (hike|increase))\b', re.I)
 UA = 'Mozilla/5.0 (compatible; stock-screener-builder/1.0)'
-INDEX_PAGES = {
-    'S&P 500': 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies',
-    'Nasdaq-100': 'https://en.wikipedia.org/wiki/Nasdaq-100',
+INDEX_PAGES = {  # name -> (Wikipedia page, minimum members for the parse to count)
+    'S&P 500': ('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', 450),
+    'Nasdaq-100': ('https://en.wikipedia.org/wiki/Nasdaq-100', 90),
 }
+SP500_CSV = 'https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv'
+MIN_STOCKS = 300  # fewer individual stocks than this means the index lists failed: do not publish
 # ETF -> category shown on the page
 ETFS = {
     'VOO': '大型股指數', 'SPY': '大型股指數', 'IVV': '大型股指數', 'VTI': '全市場', 'ITOT': '全市場',
@@ -89,23 +91,45 @@ def get(url, tries=4):
             time.sleep(2 ** i * 3)
 
 
-def index_members(url):
-    """Ticker -> company name from the first wikitable with id="constituents"."""
+def _cell(c):
+    c = re.sub(r'<sup.*?</sup>', '', c, flags=re.S)           # footnote markers
+    return re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', '', c))).strip()
+
+
+def index_members(url, minimum):
+    """Ticker -> company name from the wikitable that lists the most tickers.
+
+    Does not depend on table ids or bare <tr> tags, which change when Wikipedia changes its HTML."""
     page = get(url)
-    m = re.search(r'<table[^>]*id="constituents".*?</table>', page, re.S)
-    if not m:
-        raise RuntimeError(f'constituents table not found at {url}')
-    table = m.group(0)
-    head = re.search(r'<tr>(.*?)</tr>', table, re.S).group(1)
-    cols = [re.sub(r'<[^>]+>', '', c).strip().lower() for c in re.findall(r'<th[^>]*>(.*?)</th>', head, re.S)]
-    ti = next(i for i, c in enumerate(cols) if c in ('symbol', 'ticker'))
-    ni = next((i for i, c in enumerate(cols) if c in ('security', 'company')), None)
-    out = {}
-    for row in re.findall(r'<tr>(.*?)</tr>', table, re.S)[1:]:
-        cells = [html.unescape(re.sub(r'<[^>]+>', '', c)).strip() for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', row, re.S)]
-        if len(cells) <= ti or not re.fullmatch(r'[A-Z][A-Z.\-]{0,6}', cells[ti]):
+    best = {}
+    for table in re.findall(r'<table[^>]*class="[^"]*wikitable[^"]*"[^>]*>.*?</table>', page, re.S):
+        rows = re.findall(r'<tr[^>]*>(.*?)</tr>', table, re.S)
+        if not rows:
             continue
-        out[cells[ti]] = cells[ni] if ni is not None and ni < len(cells) else ''
+        cols = [_cell(c).lower() for c in re.findall(r'<th[^>]*>(.*?)</th>', rows[0], re.S)]
+        ti = next((i for i, c in enumerate(cols) if c in ('symbol', 'ticker', 'ticker symbol')), None)
+        if ti is None:
+            continue
+        ni = next((i for i, c in enumerate(cols) if c in ('security', 'company', 'company name')), None)
+        out = {}
+        for row in rows[1:]:
+            cells = [_cell(c) for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', row, re.S)]
+            if len(cells) > ti and re.fullmatch(r'[A-Z][A-Z.\-]{0,6}', cells[ti]):
+                out[cells[ti]] = cells[ni] if ni is not None and ni < len(cells) else ''
+        if len(out) > len(best):
+            best = out
+    if len(best) < minimum:
+        raise RuntimeError(f'only {len(best)} tickers found at {url} (expected at least {minimum})')
+    return best
+
+
+def sp500_csv(minimum):
+    """Backup S&P 500 list (github.com/datasets/s-and-p-500-companies, refreshed from Wikipedia)."""
+    import csv, io
+    rows = list(csv.DictReader(io.StringIO(get(SP500_CSV))))
+    out = {r['Symbol'].strip(): (r.get('Security') or r.get('Name') or '').strip() for r in rows if r.get('Symbol')}
+    if len(out) < minimum:
+        raise RuntimeError(f'backup list has only {len(out)} tickers')
     return out
 
 
@@ -121,13 +145,22 @@ def build_universe(prev, only):
     if only:
         return {t: {'indexes': []} for t in only}
     uni = {}
-    for name, url in INDEX_PAGES.items():
+    for name, (url, minimum) in INDEX_PAGES.items():
         try:
-            members = index_members(url)
+            members = index_members(url, minimum)
             print(f'{name}: {len(members)} members')
-        except Exception as e:  # keep last run's membership rather than drop the index
-            print(f'{name}: failed ({e}); reusing previous membership', file=sys.stderr)
-            members = {it['symbol']: it.get('name', '') for it in prev['items'] if name in it.get('indexes', [])}
+        except Exception as e:
+            print(f'{name}: Wikipedia failed ({e})', file=sys.stderr)
+            members = {}
+            if name == 'S&P 500':
+                try:
+                    members = sp500_csv(minimum)
+                    print(f'{name}: {len(members)} members from the backup list')
+                except Exception as e2:
+                    print(f'{name}: backup list failed ({e2})', file=sys.stderr)
+            if not members:  # keep last run's membership rather than drop the index
+                members = {it['symbol']: it.get('name', '') for it in prev['items'] if name in it.get('indexes', [])}
+                print(f'{name}: reusing previous membership ({len(members)})', file=sys.stderr)
         for t in members:
             uni.setdefault(t, {'indexes': []})['indexes'].append(name)
     for t in ETFS:
@@ -407,7 +440,7 @@ def add_returns(items):
         it['vol'] = round(float(daily.std()) * math.sqrt(252) * 100, 1) if len(daily) > 20 else None
         peak = s.cummax()
         it['maxDD'] = round(float((s / peak - 1).min()) * 100, 1)
-        if it.get('iv') and it.get('vol'):
+        if it.get('iv') and it.get('vol') and it['vol'] >= 3:  # near-cash funds barely move: the ratio means nothing
             it['ivHv'] = round(it['iv'] / it['vol'], 2)  # >1: options priced richer than the stock has actually moved
 
 
@@ -424,6 +457,9 @@ def main():
     uni = build_universe(prev, [t.strip().upper() for t in a.only.split(',') if t.strip()])
     tickers = sorted(uni)[:a.limit] if a.limit else sorted(uni)
     print(f'{len(tickers)} tickers')
+    n_stocks = sum(1 for t in tickers if t not in ETFS)
+    if not a.only and not a.limit and n_stocks < MIN_STOCKS:
+        sys.exit(f'only {n_stocks} individual stocks in the universe (index lists failed); not publishing')
 
     try:
         prev_news = json.load(open(NEWS_OUT, encoding='utf-8')).get('news', {})
