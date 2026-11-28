@@ -346,6 +346,10 @@ def record(t, info, meta):
         'expense': pct_auto(info.get('netExpenseRatio') or info.get('annualReportExpenseRatio')) if etf else None,
         'asOf': dt.date.today().isoformat(),
     }
+    prev = num(info.get('regularMarketPreviousClose') or info.get('previousClose'))
+    if prev and price:
+        r['prevClose'] = prev
+        r['chg1d'] = round((price / prev - 1) * 100, 2)
     if r['target'] and price:
         r['upside'] = round((r['target'] / price - 1) * 100, 1)
     return r

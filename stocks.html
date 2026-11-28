@@ -225,6 +225,27 @@ textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;
 #colSeg{max-width:100%;overflow-x:auto;scrollbar-width:thin}
 #colSeg button{white-space:nowrap;flex:none}
 #dlgBody textarea{margin-bottom:6px}
+
+.pf-stats{grid-template-columns:repeat(5,minmax(0,1fr))}
+.pf-stats .sub{font-family:var(--f-mono);font-size:13px}
+.pf-form{display:grid;grid-template-columns:1.2fr .8fr 1.2fr 1fr 1fr .9fr 2fr auto;gap:8px;align-items:end}
+.pf-form .fld input,.pf-form .fld select{width:100%}
+.pf-form .fld.sym input{text-transform:uppercase}
+.pf-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.ptbl th,.ptbl td{text-align:right}
+.ptbl td:nth-child(2),.ptbl th:nth-child(2){position:static;text-align:right;background:none}
+.ptbl th:first-child,.ptbl td:first-child{position:sticky;left:0;background:var(--panel);z-index:1;text-align:left;font-family:var(--f-body)}
+.ptbl th:first-child{z-index:3}
+.ptbl td.l,.ptbl th.l{text-align:left;font-family:var(--f-body)}
+.ptbl tr.closed td{color:var(--muted)}
+.ptbl tr.group td{background:var(--paper);font-family:var(--f-body);font-size:12px;color:var(--muted);cursor:default}
+.ptbl input.mp{width:90px;min-height:28px;padding:2px 6px;font-family:var(--f-mono);font-size:13px;text-align:right;border-color:var(--warn)}
+.wbar{display:inline-block;width:40px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;margin-left:6px;overflow:hidden}
+.wbar i{display:block;height:100%;background:var(--accent)}
+.side-b{color:var(--up)} .side-s{color:var(--down)}
+@media (max-width:900px){ .pf-form{grid-template-columns:repeat(4,minmax(0,1fr))} .pf-form .note-f{grid-column:span 3} }
+@media (max-width:720px){ .pf-stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:520px){ .pf-form{grid-template-columns:repeat(2,minmax(0,1fr))} .pf-form .note-f{grid-column:span 2} }
 @media (max-width:720px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stat .v{font-size:18px}
@@ -244,7 +265,7 @@ textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;
     <span class="asof" id="asof"></span>
   </div>
   <div class="seg views" id="viewSeg" role="tablist" aria-label="功能">
-    <button data-v="screen" aria-pressed="true">股票篩選</button><button data-v="options">選擇權策略</button>
+    <button data-v="screen" aria-pressed="true">股票篩選</button><button data-v="options">選擇權策略</button><button data-v="portfolio">我的持股</button>
   </div>
   <div class="actions">
     <a class="btn" href="index.html" title="回平面設計大師"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl">首頁</span></a>
@@ -293,6 +314,35 @@ textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;
   <ul class="news" id="wNews"></ul>
 </section>
 </div>
+<section id="pfView" hidden aria-label="我的持股">
+<section class="stats pf-stats" id="pfStats" aria-label="持股摘要"></section>
+<section class="panel" aria-label="新增交易">
+  <form class="pf-form" id="pfForm" autocomplete="off">
+    <label class="fld sym"><span>代號</span><input id="pfSym" list="symList" placeholder="AAPL" spellcheck="false" required></label>
+    <label class="fld"><span>買／賣</span><select id="pfSide"><option value="buy">買進</option><option value="sell">賣出</option></select></label>
+    <label class="fld"><span>成交日期</span><input id="pfDate" type="date" required></label>
+    <label class="fld"><span>股數</span><input id="pfQty" inputmode="decimal" placeholder="10" required></label>
+    <label class="fld"><span>每股價格 $</span><input id="pfPrice" inputmode="decimal" placeholder="成交價" required></label>
+    <label class="fld"><span>手續費 $</span><input id="pfFee" inputmode="decimal" placeholder="0"></label>
+    <label class="fld note-f"><span>備註</span><input id="pfNote" placeholder="例如 定期定額、加碼"></label>
+    <button class="btn primary" type="submit">＋ 新增紀錄</button>
+  </form>
+  <div class="pf-actions">
+    <button class="btn sm" id="pfExport" title="下載全部交易紀錄，可在其他裝置匯入">匯出紀錄</button>
+    <button class="btn sm" id="pfImport">匯入紀錄</button>
+    <button class="btn sm" id="pfCsv" title="持股與交易紀錄，Excel 可直接開">下載 CSV</button>
+    <input type="file" id="pfFile" accept=".json,application/json" hidden>
+  </div>
+  <p class="hint" id="pfHint">平均成本法：買進時把手續費算進成本；賣出時依平均成本算已實現損益，扣掉賣出手續費。現價是每個美股交易日收盤後更新的收盤價。紀錄只存在這台裝置的瀏覽器，請定期「匯出紀錄」備份。</p>
+</section>
+<div class="viewbar"><span class="count" id="pfCount"></span></div>
+<div class="table-wrap"><table id="pfTbl" class="ptbl"><thead></thead><tbody></tbody></table></div>
+<section class="panel" style="margin-top:10px" aria-label="交易紀錄">
+  <h3 class="sec">交易紀錄</h3>
+  <div class="table-wrap" style="max-height:420px"><table id="pfTx" class="ptbl"><thead></thead><tbody></tbody></table></div>
+</section>
+<p class="disclaimer">損益未計入股息、稅與匯差；「今日漲跌」是最近一個交易日相對前一天收盤。資料可能延遲或有誤，實際以券商對帳單為準。</p>
+</section>
 <section id="optView" hidden aria-label="選擇權策略評估">
 <section class="panel">
   <div class="opt-in">
@@ -349,7 +399,7 @@ textarea{border:1px solid var(--line);background:var(--paper);border-radius:8px;
 // ---------- metric catalogue ----------
 // dir: +1 higher is better, -1 lower is better (used for scores and default sort)
 const M = {
-  price:{l:'股價',u:'$',d:2}, mcap:{l:'市值',u:'B',d:1,dir:1,h:'美元十億；ETF 為資產規模'},
+  price:{l:'股價',u:'$',d:2}, chg1d:{l:'今日漲跌',u:'%',d:2,dir:1,h:'最近一個交易日相對前一天收盤'}, mcap:{l:'市值',u:'B',d:1,dir:1,h:'美元十億；ETF 為資產規模'},
   pe:{l:'本益比',d:1,dir:-1,h:'股價 ÷ 近四季 EPS'}, fpe:{l:'預估本益比',d:1,dir:-1}, peg:{l:'PEG',d:2,dir:-1,h:'本益比 ÷ 盈餘成長率，<1 常被視為便宜'},
   pb:{l:'股價淨值比',d:2,dir:-1}, ps:{l:'股價營收比',d:2,dir:-1}, evEbitda:{l:'EV/EBITDA',d:1,dir:-1},
   fcfYield:{l:'自由現金流殖利率',u:'%',d:1,dir:1},
@@ -375,7 +425,7 @@ const SCORES = {
   sQuality: [['roe',1],['margin',1],['grossMargin',.5],['de',1],['currentRatio',.5],['vol',.5]],
 };
 const COLSETS = {
-  '概覽':['price','mcap','pe','divYield','revGrowth','roe','r1y'],
+  '概覽':['price','chg1d','mcap','pe','divYield','revGrowth','roe','r1y'],
   '估值':['price','pe','fpe','peg','pb','ps','evEbitda','fcfYield','sValue'],
   '股息':['price','divYield','div5y','payout','de','beta','r5y','sDiv'],
   '成長':['price','revGrowth','epsGrowth','fpe','peg','r1y','upside','sGrowth'],
@@ -384,7 +434,7 @@ const COLSETS = {
   'ETF':['price','sector','mcap','expense','divYield','r1y','r3y','r5y'],
   '選擇權':['price','iv','vol','ivHv','divYield','beta','fromHigh','r1m'],
   '風險':['price','risk','vol','beta','maxDD','de','newsNeg','newsSent'],
-  '觀察':['price','wTarget','wGap','wChg','risk','newsSent','r1m','fromHigh'],
+  '觀察':['price','chg1d','wTarget','wGap','wChg','risk','newsSent','r1m','fromHigh'],
 };
 const PRESETS = [
   {id:'all',name:'全部',sub:'不設條件',type:'all',rules:[],sort:['mcap',-1],cols:'概覽'},
@@ -430,7 +480,7 @@ function fmt(k, v){
   if (k.startsWith('s')) return `<span class="score">${v.toFixed(0)}<span class="bar"><i style="width:${v}%"></i></span></span>`;
   let s = v.toLocaleString('en-US',{minimumFractionDigits:m.d,maximumFractionDigits:m.d});
   if (m.u === '%') s += '%'; else if (m.u === '$') s = '$' + s; else if (m.u === 'B') s = v >= 1000 ? (v/1000).toFixed(2) + 'T' : s + 'B';
-  const signed = ['r1m','rYtd','r1y','r3y','r5y','revGrowth','epsGrowth','upside','fromHigh','maxDD','newsSent','wChg'].includes(k);
+  const signed = ['r1m','rYtd','r1y','r3y','r5y','revGrowth','epsGrowth','upside','fromHigh','maxDD','newsSent','wChg','chg1d'].includes(k);
   return signed ? `<span class="${v>0?'up':v<0?'down':''}">${v>0?'+':''}${s}</span>` : s;
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -771,6 +821,7 @@ function loadItems(items, meta, label){
   $('#asof').textContent = label || (when ? `資料更新：${when.toLocaleString('zh-TW',{dateStyle:'medium',timeStyle:'short'})}` : '');
   update();
   if (!$('#optView').hidden){ oLoadSymbol(O.sym); oRender() }
+  if (!$('#pfView').hidden) pfRender();
 }
 $('#btnImport').onclick = () => $('#file').click();
 $('#file').onchange = async e => {
@@ -1115,9 +1166,10 @@ function oLoadSymbol(sym){
 }
 function setView(v, sym){
   const opt = v === 'options';
-  $('#screenView').hidden = opt; $('#optView').hidden = !opt;
+  $('#screenView').hidden = v !== 'screen'; $('#optView').hidden = !opt; $('#pfView').hidden = v !== 'portfolio';
   for (const b of document.querySelectorAll('#viewSeg button')) b.setAttribute('aria-pressed', b.dataset.v === v);
-  $('#btnExport').hidden = opt;
+  $('#btnExport').hidden = v !== 'screen';
+  if (v === 'portfolio') pfRender();
   if (opt){
     if (sym != null && sym !== O.sym) oLoadSymbol(sym);
     else if (!O.legs.length) oLoadSymbol(O.sym || (DATA.find(x => x.symbol === 'SPY') ? 'SPY' : DATA[0]?.symbol || ''));
@@ -1127,11 +1179,12 @@ function setView(v, sym){
 function route(){
   const m = location.hash.match(/^#options(?:=([A-Za-z.\-]+))?/);
   if ($('#dlg').open) $('#dlg').close();
+  if (location.hash === '#portfolio') return setView('portfolio');
   setView(m ? 'options' : 'screen', m && m[1] ? m[1].toUpperCase() : null);
 }
 window.addEventListener('hashchange', route);
 $('#viewSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
-  location.hash = b.dataset.v === 'options' ? 'options' + (O.sym ? '=' + O.sym : '') : '' };
+  location.hash = b.dataset.v === 'options' ? 'options' + (O.sym ? '=' + O.sym : '') : b.dataset.v === 'portfolio' ? 'portfolio' : '' };
 $('#oSym').addEventListener('change', e => { const v = e.target.value.trim().toUpperCase(); if (v) location.hash = 'options=' + v });
 $('#optView').addEventListener('input', e => {
   const k = e.target.dataset.k; if (!k) return;
@@ -1169,6 +1222,146 @@ $('#oTheo').onclick = () => { for (const l of O.legs){ l.auto = true; priceLeg(l
 $('#oReset').onclick = () => { oLoadStrategy(O.strat); oTable(); oDetail() };
 let oRT; window.addEventListener('resize', () => { clearTimeout(oRT); oRT = setTimeout(() => { if (!$('#optView').hidden) oChart(analyze(O.legs)) }, 150) });
 
+
+// ---------- portfolio: transactions -> holdings with average cost ----------
+const PF = (() => { const p = store.get('portfolio', null); return p && Array.isArray(p.tx) ? {tx:p.tx, manual:p.manual || {}} : {tx:[], manual:{}} })();
+const savePF = () => store.set('portfolio', PF);
+const usd = (v, sign) => !isNum(v) ? '—' : (sign && v > 0 ? '+' : v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const pctS = v => !isNum(v) ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+const qtyS = v => (+v.toFixed(6)).toLocaleString('en-US', {maximumFractionDigits:6});
+function pfCompute(){
+  const by = {};
+  const tx = PF.tx.map((t, i) => ({...t, i})).sort((a, b) => a.date.localeCompare(b.date) || a.i - b.i);
+  for (const t of tx){
+    const h = by[t.sym] ||= {sym:t.sym, qty:0, cost:0, realized:0, bought:0, warn:false};
+    const fee = t.fee || 0;
+    if (t.side === 'buy'){ h.cost += t.qty*t.price + fee; h.qty += t.qty; h.bought += t.qty*t.price + fee }
+    else {
+      if (t.qty > h.qty + 1e-9) h.warn = true; // sold more than held on that date
+      const q = Math.min(t.qty, h.qty), avg = h.qty ? h.cost/h.qty : 0;
+      h.realized += q*t.price - fee - avg*q; h.cost -= avg*q; h.qty -= q;
+      if (h.qty < 1e-9){ h.qty = 0; h.cost = 0 }
+    }
+  }
+  const tot = {mv:0, cost:0, upl:0, day:0, dayBase:0, realized:0, missing:0};
+  const open = [], closed = [];
+  for (const h of Object.values(by)){
+    tot.realized += h.realized;
+    if (!h.qty){ closed.push(h); continue }
+    const it = DATA.find(x => x.symbol === h.sym && !x.placeholder);
+    h.it = it; h.manual = isNum(PF.manual[h.sym]);
+    h.price = h.manual ? PF.manual[h.sym] : it && isNum(it.price) ? it.price : null;
+    h.avg = h.cost / h.qty;
+    if (h.price == null){ tot.missing++; tot.cost += h.cost; open.push(h); continue }
+    h.mv = h.qty*h.price; h.upl = h.mv - h.cost; h.uplPct = h.cost ? h.upl/h.cost*100 : null;
+    if (!h.manual && it && isNum(it.prevClose)){ h.day = h.qty*(it.price - it.prevClose); h.dayPct = it.chg1d; tot.day += h.day; tot.dayBase += h.qty*it.prevClose }
+    tot.mv += h.mv; tot.cost += h.cost; tot.upl += h.upl;
+    open.push(h);
+  }
+  for (const h of open) h.weight = tot.mv && h.mv ? h.mv/tot.mv*100 : null;
+  open.sort((a, b) => (b.mv ?? -1) - (a.mv ?? -1));
+  closed.sort((a, b) => b.realized - a.realized);
+  return {open, closed, tot};
+}
+function pfRender(){
+  const {open, closed, tot} = pfCompute();
+  const pricedCost = open.filter(h => h.mv != null).reduce((a, h) => a + h.cost, 0);
+  const tile = (k, v, sub = '', c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div>${sub ? `<div class="sub ${c}">${sub}</div>` : ''}</div>`;
+  $('#pfStats').innerHTML = [
+    tile('目前市值', usd(tot.mv), tot.missing ? `${tot.missing} 檔沒有現價` : `${open.length} 檔持股`),
+    tile('總成本', usd(tot.cost)),
+    tile('未實現損益', usd(tot.upl, true), pricedCost ? pctS(tot.upl/pricedCost*100) : '', cls(tot.upl)),
+    tile('今日漲跌', tot.dayBase ? usd(tot.day, true) : '—', tot.dayBase ? pctS(tot.day/tot.dayBase*100) : '', cls(tot.day)),
+    tile('已實現損益', usd(tot.realized, true), '賣出部分累計', cls(tot.realized)),
+  ].join('');
+  $('#pfCount').textContent = PF.tx.length ? `${open.length} 檔持股` + (closed.length ? `、${closed.length} 檔已出清` : '') + `，共 ${PF.tx.length} 筆交易` : '';
+  const head = ['代號／名稱','股數','平均成本','總成本','現價','市值','未實現損益','報酬率','今日漲跌','佔比','風險'];
+  $('#pfTbl thead').innerHTML = `<tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>`;
+  const symCell = (h, extra = '') => `<td class="sym" data-open="${esc(h.sym)}" style="cursor:pointer"><b>${esc(h.sym)}</b>${h.warn ? ' <span class="lvl m" title="賣出股數超過當時持有股數，請檢查紀錄">紀錄有誤</span>' : ''}<span class="nm">${esc(h.it?.name || extra)}</span></td>`;
+  let rows = open.map(h => `<tr>
+    ${symCell(h, '不在每日資料裡')}
+    <td>${qtyS(h.qty)}</td><td>${usd(h.avg)}</td><td>${usd(h.cost)}</td>
+    <td>${h.it && !h.manual ? usd(h.price) : `<input class="mp" data-mp="${esc(h.sym)}" inputmode="decimal" value="${h.manual ? PF.manual[h.sym] : ''}" placeholder="手動現價" title="沒有每日資料，請自己輸入現價" aria-label="${esc(h.sym)} 現價">`}</td>
+    <td>${usd(h.mv)}</td><td class="${cls(h.upl)}">${usd(h.upl, true)}</td><td class="${cls(h.uplPct)}">${pctS(h.uplPct)}</td>
+    <td class="${cls(h.day)}">${isNum(h.day) ? `${usd(h.day, true)}<br><small>${pctS(h.dayPct)}</small>` : '—'}</td>
+    <td>${isNum(h.weight) ? h.weight.toFixed(1) + '%<span class="wbar"><i style="width:' + Math.min(100, h.weight) + '%"></i></span>' : '—'}</td>
+    <td>${h.it ? fmt('risk', h.it.risk) : '—'}</td></tr>`).join('');
+  if (closed.length) rows += `<tr class="group"><td colspan="${head.length}">已出清（只計已實現損益）</td></tr>` + closed.map(h => `<tr class="closed">
+    ${symCell(h)}<td>0</td><td colspan="4">—</td><td class="${cls(h.realized)}">${usd(h.realized, true)}</td><td class="${cls(h.realized)}">${h.bought ? pctS(h.realized/h.bought*100) : '—'}</td><td colspan="3"></td></tr>`).join('');
+  $('#pfTbl tbody').innerHTML = rows || `<tr><td colspan="${head.length}" class="empty"><h2>還沒有持股紀錄</h2>在上方輸入代號、日期、股數和成交價，按「新增紀錄」。</td></tr>`;
+  const tx = PF.tx.map((t, i) => ({...t, i})).sort((a, b) => b.date.localeCompare(a.date) || b.i - a.i);
+  $('#pfTx thead').innerHTML = '<tr><th class="l">日期</th><th class="l">代號</th><th class="l">買／賣</th><th>股數</th><th>每股價格</th><th>手續費</th><th>金額</th><th class="l">備註</th><th><span class="sr" aria-label="刪除"></span></th></tr>';
+  $('#pfTx tbody').innerHTML = tx.length ? tx.map(t => `<tr>
+    <td class="l mono">${esc(t.date)}</td><td class="l"><b class="mono">${esc(t.sym)}</b></td>
+    <td class="l ${t.side === 'buy' ? 'side-b' : 'side-s'}">${t.side === 'buy' ? '買進' : '賣出'}</td>
+    <td>${qtyS(t.qty)}</td><td>${usd(t.price)}</td><td>${usd(t.fee || 0)}</td>
+    <td>${t.side === 'buy' ? '付 ' + usd(t.qty*t.price + (t.fee || 0)) : '收 ' + usd(t.qty*t.price - (t.fee || 0))}</td>
+    <td class="l" style="white-space:normal;min-width:120px">${esc(t.note || '')}</td>
+    <td><button class="btn sm ghost" data-deltx="${t.id}" aria-label="刪除這筆紀錄">刪除</button></td></tr>`).join('')
+    : '<tr><td colspan="9" class="empty">尚無交易紀錄</td></tr>';
+}
+function pfAdd(e){
+  e.preventDefault();
+  const sym = $('#pfSym').value.trim().toUpperCase(), side = $('#pfSide').value, date = $('#pfDate').value;
+  const qty = Number($('#pfQty').value), price = Number($('#pfPrice').value), fee = $('#pfFee').value.trim() ? Number($('#pfFee').value) : 0;
+  if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym)) return toast('代號格式不對');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('請選擇成交日期');
+  if (!(qty > 0) || !(price > 0) || !(fee >= 0)) return toast('股數和價格要大於 0，手續費不能是負數');
+  if (side === 'sell'){
+    const held = PF.tx.filter(t => t.sym === sym && t.date <= date).reduce((a, t) => a + (t.side === 'buy' ? t.qty : -t.qty), 0);
+    if (qty > held + 1e-9) return toast(`${date} 時只持有 ${qtyS(Math.max(held, 0))} 股 ${sym}，不能賣出 ${qtyS(qty)} 股`);
+  }
+  PF.tx.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), sym, side, date, qty, price, fee, note: $('#pfNote').value.trim()});
+  savePF(); pfRender();
+  for (const id of ['pfQty','pfPrice','pfFee','pfNote']) $('#'+id).value = '';
+  toast(`已記錄：${side === 'buy' ? '買進' : '賣出'} ${sym} ${qtyS(qty)} 股 @ ${usd(price)}`);
+}
+$('#pfForm').addEventListener('submit', pfAdd);
+$('#pfDate').value = today();
+$('#pfSym').addEventListener('change', e => { const it = DATA.find(x => x.symbol === e.target.value.trim().toUpperCase() && !x.placeholder);
+  if (it && isNum(it.price) && !$('#pfPrice').value) $('#pfPrice').value = it.price });
+$('#pfTx').addEventListener('click', e => { const id = e.target.dataset.deltx; if (!id) return;
+  const t = PF.tx.find(x => x.id === id); if (!t || !confirm(`刪除 ${t.date} ${t.side === 'buy' ? '買進' : '賣出'} ${t.sym} ${qtyS(t.qty)} 股這筆紀錄？`)) return;
+  PF.tx = PF.tx.filter(x => x.id !== id); savePF(); pfRender() });
+$('#pfTbl').addEventListener('click', e => { const c = e.target.closest('[data-open]'); if (c && DATA.some(x => x.symbol === c.dataset.open)) openDetail(c.dataset.open) });
+$('#pfTbl').addEventListener('change', e => { const s = e.target.dataset.mp; if (!s) return;
+  const v = e.target.value.trim(), n = Number(v);
+  if (v && !(n > 0)) return toast('現價要大於 0');
+  if (v) PF.manual[s] = n; else delete PF.manual[s]; savePF(); pfRender() });
+$('#pfExport').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({exported:new Date().toISOString(), portfolio:PF}, null, 1)], {type:'application/json'}));
+  a.download = `持股紀錄-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#pfImport').onclick = () => $('#pfFile').click();
+$('#pfFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()), src = j.portfolio || j;
+    if (!Array.isArray(src.tx)) throw new Error('檔案裡沒有交易紀錄');
+    const have = new Set(PF.tx.map(t => t.id)); let n = 0;
+    for (const t of src.tx){
+      const ok = t && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(t.sym) && ['buy','sell'].includes(t.side) && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.qty > 0 && t.price > 0;
+      if (!ok || have.has(t.id)) continue;
+      PF.tx.push({id: String(t.id || Date.now().toString(36) + n), sym:t.sym, side:t.side, date:t.date, qty:+t.qty, price:+t.price, fee:+t.fee || 0, note:String(t.note || '')}); n++;
+    }
+    Object.assign(PF.manual, src.manual || {});
+    savePF(); pfRender(); toast(`已匯入 ${n} 筆交易（重複的略過）`);
+  } catch (err) { toast('匯入失敗：' + err.message) }
+};
+$('#pfCsv').onclick = () => {
+  const {open, closed} = pfCompute();
+  const cell = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const r2 = v => isNum(v) ? Math.round(v*100)/100 : '';
+  const lines = [['持股'], ['代號','名稱','股數','平均成本','總成本','現價','市值','未實現損益','報酬率(%)','今日漲跌','已實現損益'],
+    ...open.map(h => [h.sym, h.it?.name || '', h.qty, r2(h.avg), r2(h.cost), r2(h.price), r2(h.mv), r2(h.upl), r2(h.uplPct), r2(h.day), r2(h.realized)]),
+    ...closed.map(h => [h.sym, '(已出清)', 0, '', '', '', '', '', '', '', r2(h.realized)]),
+    [], ['交易紀錄'], ['日期','代號','買賣','股數','每股價格','手續費','備註'],
+    ...[...PF.tx].sort((a, b) => a.date.localeCompare(b.date)).map(t => [t.date, t.sym, t.side === 'buy' ? '買進' : '賣出', t.qty, t.price, t.fee || 0, t.note || ''])];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.map(r => r.map(cell).join(',')).join('\r\n')], {type:'text/csv'}));
+  a.download = `持股-${today()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
 // ---------- boot ----------
 (function boot(){
   const v = store.get('view', null);
